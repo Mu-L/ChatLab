@@ -180,7 +180,7 @@ async function loadMembersWithNicknameChanges() {
 
     members.value.forEach((member, index) => {
       const history = allHistories[index]
-      if (history.length > 1) {
+      if (history.length > 2) {
         membersWithChanges.push({
           memberId: member.id,
           name: getDisplayName(member),
@@ -351,7 +351,7 @@ onMounted(() => {
 
                 <!-- 操作 -->
                 <td class="px-4 py-4 text-right">
-                  <UButton label="删除" variant="link" color="error" size="xs" @click="showDeleteConfirm(member)" />
+                  <UButton label="删除" size="xs" @click="showDeleteConfirm(member)" />
                 </td>
               </tr>
             </tbody>
@@ -476,4 +476,3 @@ onMounted(() => {
     </UModal>
   </div>
 </template>
-

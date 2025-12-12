@@ -278,8 +278,14 @@ onMounted(() => {
               <span class="whitespace-nowrap">{{ tab.label }}</span>
             </button>
           </div>
-          <!-- 年份选择器靠右，允许收缩 -->
-          <UITabs v-model="selectedYear" :items="yearOptions" size="sm" class="min-w-0 flex-shrink" />
+          <!-- 年份选择器靠右，允许收缩（AI实验室时隐藏） -->
+          <UITabs
+            v-if="activeTab !== 'ai'"
+            v-model="selectedYear"
+            :items="yearOptions"
+            size="sm"
+            class="min-w-0 flex-shrink"
+          />
         </div>
       </div>
 
@@ -340,10 +346,9 @@ onMounted(() => {
             />
             <AITab
               v-else-if="activeTab === 'ai'"
-              :key="'ai-' + selectedYear"
+              :key="'ai'"
               :session-id="currentSessionId!"
               :session-name="session.name"
-              :time-filter="timeFilter"
               chat-type="group"
             />
           </Transition>
@@ -376,4 +381,3 @@ onMounted(() => {
   transform: translateY(-10px);
 }
 </style>
-
