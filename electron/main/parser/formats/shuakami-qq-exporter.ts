@@ -227,16 +227,20 @@ function convertMessageType(
 // ==================== 解析器实现 ====================
 
 async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void, unknown> {
-  const { filePath, batchSize = 5000, onProgress } = options
+  const { filePath, batchSize = 5000, onProgress, onLog } = options
 
   const totalBytes = getFileSize(filePath)
   let bytesRead = 0
   let messagesProcessed = 0
+  let skippedMessages = 0 // 跳过的无效消息计数
 
   // 发送初始进度
   const initialProgress = createProgress('parsing', 0, totalBytes, 0, '开始解析...')
   yield { type: 'progress', data: initialProgress }
   onProgress?.(initialProgress)
+
+  // 记录解析开始
+  onLog?.('info', `开始解析 QQ Chat Exporter 文件，大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`)
 
   // 读取文件头获取 meta 信息（增加到 500KB 以包含 chatInfo.avatar）
   const headContent = readFileHeadBytes(filePath, 500000)
@@ -283,7 +287,10 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
       // 获取 platformId
       const platformId =
         value.sender.uin || value.sender.uid || value.rawMessage?.senderUin || value.rawMessage?.senderUid
-      if (!platformId) return
+      if (!platformId) {
+        skippedMessages++
+        return
+      }
 
       // 获取名字信息
       const raw = value.rawMessage
@@ -301,7 +308,10 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
 
       // 解析时间戳
       const timestamp = parseTimestamp(value.timestamp)
-      if (timestamp === null || !isValidYear(timestamp)) return
+      if (timestamp === null || !isValidYear(timestamp)) {
+        skippedMessages++
+        return
+      }
 
       // 消息类型
       const type = value.isSystemMessage
@@ -388,6 +398,12 @@ async function* parseV4(options: ParseOptions): AsyncGenerator<ParseEvent, void,
   const doneProgress = createProgress('done', totalBytes, totalBytes, messagesProcessed, '解析完成')
   yield { type: 'progress', data: doneProgress }
   onProgress?.(doneProgress)
+
+  // 记录解析摘要
+  onLog?.('info', `解析完成: ${messagesProcessed} 条消息, ${memberMap.size} 个成员`)
+  if (skippedMessages > 0) {
+    onLog?.('info', `跳过 ${skippedMessages} 条无效消息（缺少发送者ID或时间戳无效）`)
+  }
 
   yield {
     type: 'done',

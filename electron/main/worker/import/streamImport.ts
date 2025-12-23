@@ -18,7 +18,15 @@ import {
   type ParsedMessage,
 } from '../../parser'
 import { getDbDir } from '../core'
-import { initPerfLog, logPerf, logPerfDetail, resetPerfLog } from '../core'
+import {
+  initPerfLog,
+  logPerf,
+  logPerfDetail,
+  resetPerfLog,
+  logInfo,
+  logError,
+  logSummary,
+} from '../core'
 
 /** 流式导入结果 */
 export interface StreamImportResult {
@@ -210,6 +218,11 @@ export async function streamImport(filePath: string, requestId: string): Promise
   resetPerfLog()
   const sessionId = generateSessionId()
   initPerfLog(sessionId)
+
+  // 记录导入开始信息
+  logInfo(`文件路径: ${filePath}`)
+  logInfo(`检测到格式: ${formatFeature.name} (${formatFeature.id})`)
+  logInfo(`平台: ${formatFeature.platform}`)
   logPerf('开始导入', 0)
 
   // 预处理：如果格式需要且文件较大，先精简
@@ -218,6 +231,7 @@ export async function streamImport(filePath: string, requestId: string): Promise
   const preprocessor = getPreprocessor(filePath)
 
   if (preprocessor && needsPreprocess(filePath)) {
+    logInfo('文件需要预处理，开始精简大文件...')
     sendProgress(requestId, {
       stage: 'parsing',
       bytesRead: 0,
@@ -235,10 +249,13 @@ export async function streamImport(filePath: string, requestId: string): Promise
         })
       })
       actualFilePath = tempFilePath
+      logInfo(`预处理完成，临时文件: ${tempFilePath}`)
     } catch (err) {
+      const errorMsg = `预处理失败: ${err instanceof Error ? err.message : String(err)}`
+      logError(errorMsg, err instanceof Error ? err : undefined)
       return {
         success: false,
-        error: `预处理失败: ${err instanceof Error ? err.message : String(err)}`,
+        error: errorMsg,
       }
     }
   }
@@ -349,6 +366,15 @@ export async function streamImport(filePath: string, requestId: string): Promise
       onProgress: (progress) => {
         // 转发进度到主进程
         sendProgress(requestId, progress)
+      },
+
+      onLog: (level, message) => {
+        // 将解析器日志写入导入日志文件
+        if (level === 'error') {
+          logError(message)
+        } else {
+          logInfo(message)
+        }
       },
 
       onMeta: (meta: ParsedMeta) => {
@@ -625,8 +651,14 @@ export async function streamImport(filePath: string, requestId: string): Promise
     logPerf('WAL checkpoint 完成', totalMessageCount)
     logPerf('导入完成', totalMessageCount)
 
+    // 写入日志摘要
+    logSummary(totalMessageCount, memberIdMap.size)
+
     return { success: true, sessionId }
   } catch (error) {
+    // 记录错误日志
+    logError('导入失败', error instanceof Error ? error : undefined)
+
     // 回滚当前事务
     if (inTransaction) {
       try {

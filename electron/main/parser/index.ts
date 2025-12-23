@@ -219,6 +219,8 @@ export interface StreamParseCallbacks {
   onMeta: (meta: ParsedMeta) => void
   onMembers: (members: ParsedMember[]) => void
   onMessageBatch: (messages: ParsedMessage[]) => void
+  /** 日志回调（可选） */
+  onLog?: (level: 'info' | 'error', message: string) => void
 }
 
 export interface StreamParseOptions extends StreamParseCallbacks {
@@ -234,9 +236,9 @@ export async function streamParseFile(
   filePath: string,
   callbacks: Omit<StreamParseOptions, 'filePath'>
 ): Promise<void> {
-  const { onProgress, onMeta, onMembers, onMessageBatch, batchSize = 5000 } = callbacks
+  const { onProgress, onMeta, onMembers, onMessageBatch, onLog, batchSize = 5000 } = callbacks
 
-  for await (const event of parseFile({ filePath, batchSize, onProgress })) {
+  for await (const event of parseFile({ filePath, batchSize, onProgress, onLog })) {
     switch (event.type) {
       case 'meta':
         onMeta(event.data)

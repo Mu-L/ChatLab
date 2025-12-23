@@ -90,6 +90,9 @@ export interface FormatFeature {
 
 // ==================== 解析层：解析器接口 ====================
 
+/** 日志级别 */
+export type LogLevel = 'info' | 'error'
+
 /**
  * 解析选项
  */
@@ -100,6 +103,8 @@ export interface ParseOptions {
   batchSize?: number
   /** 进度回调（可选，用于外部监听） */
   onProgress?: (progress: ParseProgress) => void
+  /** 日志回调（可选，用于记录解析过程中的信息、警告、错误） */
+  onLog?: (level: LogLevel, message: string) => void
 }
 
 /**

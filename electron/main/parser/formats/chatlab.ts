@@ -76,7 +76,7 @@ interface ChatLabMember {
 // ==================== 解析器实现 ====================
 
 async function* parseChatLab(options: ParseOptions): AsyncGenerator<ParseEvent, void, unknown> {
-  const { filePath, batchSize = 5000, onProgress } = options
+  const { filePath, batchSize = 5000, onProgress, onLog } = options
 
   const totalBytes = getFileSize(filePath)
   let bytesRead = 0
@@ -86,6 +86,9 @@ async function* parseChatLab(options: ParseOptions): AsyncGenerator<ParseEvent, 
   const initialProgress = createProgress('parsing', 0, totalBytes, 0, '开始解析...')
   yield { type: 'progress', data: initialProgress }
   onProgress?.(initialProgress)
+
+  // 记录解析开始
+  onLog?.('info', `开始解析 ChatLab 格式文件，大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`)
 
   // 读取文件头获取 meta 和 members 信息
   const headContent = readFileHeadBytes(filePath, 200000)
@@ -246,11 +249,15 @@ async function* parseChatLab(options: ParseOptions): AsyncGenerator<ParseEvent, 
   yield { type: 'progress', data: doneProgress }
   onProgress?.(doneProgress)
 
+  // 记录解析摘要
+  const memberCount = members.length > 0 ? members.length : memberMapFromMessages.size
+  onLog?.('info', `解析完成: ${messagesProcessed} 条消息, ${memberCount} 个成员`)
+
   yield {
     type: 'done',
     data: {
       messageCount: messagesProcessed,
-      memberCount: members.length > 0 ? members.length : memberMapFromMessages.size,
+      memberCount,
     },
   }
 }

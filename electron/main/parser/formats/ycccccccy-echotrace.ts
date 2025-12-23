@@ -147,7 +147,7 @@ interface MemberInfo {
 // ==================== 解析器实现 ====================
 
 async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent, void, unknown> {
-  const { filePath, batchSize = 5000, onProgress } = options
+  const { filePath, batchSize = 5000, onProgress, onLog } = options
 
   const totalBytes = getFileSize(filePath)
   let bytesRead = 0
@@ -157,6 +157,9 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
   const initialProgress = createProgress('parsing', 0, totalBytes, 0, '开始解析...')
   yield { type: 'progress', data: initialProgress }
   onProgress?.(initialProgress)
+
+  // 记录解析开始
+  onLog?.('info', `开始解析 Echotrace 微信导出文件，大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`)
 
   // 读取文件头获取 session 信息
   const headContent = readFileHeadBytes(filePath, 2000)
@@ -485,6 +488,9 @@ async function* parseEchotrace(options: ParseOptions): AsyncGenerator<ParseEvent
   yield { type: 'progress', data: doneProgress }
   onProgress?.(doneProgress)
 
+  // 记录解析摘要
+  onLog?.('info', `解析完成: ${messagesProcessed} 条消息, ${memberMap.size} 个成员`)
+
   yield {
     type: 'done',
     data: { messageCount: messagesProcessed, memberCount: memberMap.size },
@@ -500,7 +506,7 @@ export const parser_: Parser = {
 
 // ==================== 预处理器（预留） ====================
 
-import { echotracePreprocessor } from './echotrace-preprocessor'
+import { echotracePreprocessor } from './ycccccccy-echotrace-preprocessor'
 export const preprocessor = echotracePreprocessor
 
 // ==================== 导出格式模块 ====================

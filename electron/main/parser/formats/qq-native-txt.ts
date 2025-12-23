@@ -50,17 +50,19 @@ export const feature: FormatFeature = {
   priority: 30,
   extensions: ['.txt'],
   signatures: {
-    head: [/消息记录（此消息记录为文本格式/, /消息对象:/],
+    // 支持群聊导出和多人聊天（讨论组）导出
+    head: [/消息记录（此消息记录为文本格式/, /消息对象:/, /多人聊天/],
   },
 }
 
 // ==================== 消息头正则 ====================
 
-// 匹配：2019-07-16 18:15:05 夜喵大人🐱(642163903)
-// 或：2019-07-16 18:15:11 铛🔔<ppbaozi@gmail.com>
-const MESSAGE_HEADER_REGEX = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (.+?)(?:\(([^)]+)\)|<([^>]+)>)$/
+// 群聊格式：2019-07-16 18:15:05 地瓜(23333233)
+// 邮箱格式：2019-07-16 18:15:11 土豆<example@xx.com>
+// 讨论组格式：2017-08-29 20:28:30 番茄（没有 ID，只有昵称）
+const MESSAGE_HEADER_REGEX = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (.+?)(?:\(([^)]+)\)|<([^>]+)>)?$/
 
-// 匹配群名：消息对象:杭州FE
+// 匹配群名：消息对象:xxx
 const GROUP_NAME_REGEX = /^消息对象:(.+)$/
 
 // ==================== 消息类型判断 ====================
@@ -141,16 +143,20 @@ const lastValidNickname = new Map<string, string>()
 // ==================== 解析器实现 ====================
 
 async function* parseTxt(options: ParseOptions): AsyncGenerator<ParseEvent, void, unknown> {
-  const { filePath, batchSize = 5000, onProgress } = options
+  const { filePath, batchSize = 5000, onProgress, onLog } = options
 
   const totalBytes = getFileSize(filePath)
   let bytesRead = 0
   let messagesProcessed = 0
+  let skippedLines = 0 // 跳过的无效行计数
 
   // 发送初始进度
   const initialProgress = createProgress('parsing', 0, totalBytes, 0, '开始解析...')
   yield { type: 'progress', data: initialProgress }
   onProgress?.(initialProgress)
+
+  // 记录解析开始
+  onLog?.('info', `开始解析 QQ TXT 文件，大小: ${(totalBytes / 1024 / 1024).toFixed(2)} MB`)
 
   // 收集数据
   let groupName = '未知群聊'
@@ -218,17 +224,19 @@ async function* parseTxt(options: ParseOptions): AsyncGenerator<ParseEvent, void
       const timeStr = headerMatch[1]
       const rawNickname = headerMatch[2].trim()
       let nickname = cleanNickname(rawNickname) // 清理前缀污染
-      const platformId = headerMatch[3] || headerMatch[4] // (id) 或 <email>
+      // platformId: (id) 或 <email>，如果没有则使用昵称（讨论组格式）
+      let platformId = headerMatch[3] || headerMatch[4] || nickname
 
       // 如果昵称和 ID 相同，可能是系统故障，使用之前记录的昵称
-      if (nickname === platformId) {
+      if (nickname === platformId && headerMatch[3]) {
+        // 只有当确实有 ID 时才检查昵称覆盖
         const previousNickname = lastValidNickname.get(platformId)
         if (previousNickname) {
           nickname = previousNickname
         }
         // 如果没有之前的记录，保持使用 ID 作为昵称
-      } else {
-        // 记录有效昵称（昵称 != ID）
+      } else if (headerMatch[3] || headerMatch[4]) {
+        // 记录有效昵称（有 ID 且昵称 != ID）
         lastValidNickname.set(platformId, nickname)
       }
 
@@ -262,6 +270,18 @@ async function* parseTxt(options: ParseOptions): AsyncGenerator<ParseEvent, void
       if (line.startsWith('消息记录') || line.startsWith('消息分组')) continue
 
       currentMessage.contentLines.push(line)
+    } else {
+      // 没有当前消息时，检查是否是需要跳过的行
+      const trimmed = line.trim()
+      if (
+        trimmed &&
+        !trimmed.startsWith('=====') &&
+        !trimmed.startsWith('消息记录') &&
+        !trimmed.startsWith('消息分组')
+      ) {
+        // 这是一个无法解析的非空行
+        skippedLines++
+      }
     }
   }
 
@@ -294,6 +314,12 @@ async function* parseTxt(options: ParseOptions): AsyncGenerator<ParseEvent, void
   const doneProgress = createProgress('done', totalBytes, totalBytes, messagesProcessed, '解析完成')
   yield { type: 'progress', data: doneProgress }
   onProgress?.(doneProgress)
+
+  // 记录解析摘要
+  onLog?.('info', `解析完成: ${messagesProcessed} 条消息, ${memberMap.size} 个成员`)
+  if (skippedLines > 0) {
+    onLog?.('info', `跳过 ${skippedLines} 行无法解析的内容`)
+  }
 
   yield {
     type: 'done',

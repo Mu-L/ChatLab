@@ -1,16 +1,25 @@
 /**
- * 性能日志模块
- * 实时记录导入过程的性能指标
+ * 导入日志模块
+ * 实时记录导入过程的性能指标、错误和警告信息
  */
 
 import * as fs from 'fs'
 import * as path from 'path'
 import { getDbDir } from './dbCore'
 
+// 日志级别
+export enum LogLevel {
+  ERROR = 'ERROR',
+  INFO = 'INFO',
+}
+
 // 状态
 let lastLogTime = Date.now()
 let lastMessageCount = 0
 let currentLogFile: string | null = null
+
+// 统计计数器
+let errorCount = 0
 
 /**
  * 获取性能日志目录
@@ -32,7 +41,7 @@ export function initPerfLog(sessionId: string): void {
     const logDir = getLogDir()
     currentLogFile = path.join(logDir, `import_${sessionId}_${Date.now()}.log`)
     // 写入头部
-    fs.writeFileSync(currentLogFile, `=== 导入性能日志 ===\n开始时间: ${new Date().toISOString()}\n\n`, 'utf-8')
+    fs.writeFileSync(currentLogFile, `=== 导入日志 ===\n开始时间: ${new Date().toISOString()}\n\n`, 'utf-8')
   } catch {
     // 忽略初始化失败
   }
@@ -98,6 +107,7 @@ export function resetPerfLog(): void {
   lastLogTime = Date.now()
   lastMessageCount = 0
   currentLogFile = null
+  errorCount = 0
 }
 
 /**
@@ -105,4 +115,66 @@ export function resetPerfLog(): void {
  */
 export function getCurrentLogFile(): string | null {
   return currentLogFile
+}
+
+// ==================== 通用日志函数 ====================
+
+/**
+ * 写入日志行
+ */
+function writeLogLine(level: LogLevel, message: string): void {
+  if (!currentLogFile) return
+
+  const logLine = `[${new Date().toISOString()}] [${level}] ${message}\n`
+  try {
+    fs.appendFileSync(currentLogFile, logLine, 'utf-8')
+  } catch {
+    // 忽略写入失败
+  }
+}
+
+/**
+ * 记录错误日志
+ * @param message 错误描述
+ * @param error 可选的 Error 对象
+ */
+export function logError(message: string, error?: Error): void {
+  errorCount++
+  const errorDetail = error ? `: ${error.message}` : ''
+  writeLogLine(LogLevel.ERROR, `${message}${errorDetail}`)
+}
+
+/**
+ * 记录信息日志
+ * @param message 信息描述
+ */
+export function logInfo(message: string): void {
+  writeLogLine(LogLevel.INFO, message)
+}
+
+/**
+ * 获取错误计数
+ */
+export function getErrorCount(): number {
+  return errorCount
+}
+
+/**
+ * 写入日志摘要（导入完成时调用）
+ */
+export function logSummary(totalMessages: number, totalMembers: number): void {
+  if (!currentLogFile) return
+
+  const summary = `
+=== 导入摘要 ===
+结束时间: ${new Date().toISOString()}
+总消息数: ${totalMessages.toLocaleString()}
+总成员数: ${totalMembers.toLocaleString()}
+错误数: ${errorCount}
+`
+  try {
+    fs.appendFileSync(currentLogFile, summary, 'utf-8')
+  } catch {
+    // 忽略
+  }
 }
