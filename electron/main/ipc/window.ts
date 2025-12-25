@@ -6,7 +6,7 @@ import { ipcMain, app, dialog, clipboard, shell } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as fs from 'fs/promises'
 import type { IpcContext } from './types'
-import { simulateUpdateDialog, setManualCheck } from '../update'
+import { simulateUpdateDialog } from '../update'
 
 /**
  * 注册窗口和文件系统操作 IPC 处理器
@@ -72,7 +72,6 @@ export function registerWindowHandlers(ctx: IpcContext): void {
 
   // ==================== 更新检查 ====================
   ipcMain.on('check-update', () => {
-    setManualCheck(true)
     autoUpdater.checkForUpdates()
   })
 

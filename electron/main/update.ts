@@ -4,33 +4,6 @@ import { platform } from '@electron-toolkit/utils'
 import { logger } from './logger'
 
 let isFirstShow = true
-let isManualCheck = false
-
-export const setManualCheck = (value: boolean) => {
-  isManualCheck = value
-}
-
-/**
- * 比较两个版本号，判断是否为中版本（Minor）或大版本（Major）更新
- * @param current 当前版本
- * @param latest 最新版本
- * @returns true if Major or Minor update, false if Patch update or same/older
- */
-const isMajorOrMinorUpdate = (current: string, latest: string): boolean => {
-  try {
-    const [cMajor, cMinor] = current.split('.').map(Number)
-    const [lMajor, lMinor] = latest.split('.').map(Number)
-
-    if (lMajor > cMajor) return true
-    if (lMajor === cMajor && lMinor > cMinor) return true
-
-    return false
-  } catch (e) {
-    console.error('Version compare error:', e)
-    return true // Fallback to show update if parse fails
-  }
-}
-
 const checkUpdate = (win) => {
   autoUpdater.autoDownload = false // 自动下载
   autoUpdater.autoInstallOnAppQuit = true // 应用退出后自动安装
@@ -49,17 +22,6 @@ const checkUpdate = (win) => {
   autoUpdater.on('update-available', (info) => {
     // win.webContents.send('show-message', 'electron:发现新版本')
     if (showUpdateMessageBox) return
-
-    // 如果不是手动检查，且不是大版本或中版本更新（即小版本更新），则忽略
-    if (!isManualCheck && !isMajorOrMinorUpdate(app.getVersion(), info.version)) {
-      console.log(`[Update] Ignore patch update: ${app.getVersion()} -> ${info.version}`)
-      isManualCheck = false
-      return
-    }
-
-    // 重置手动检查标记
-    isManualCheck = false
-
     showUpdateMessageBox = true
 
     // 解析更新日志
@@ -151,22 +113,17 @@ const checkUpdate = (win) => {
     if (isFirstShow) {
       isFirstShow = false
     } else {
-      // 只有手动检查才提示"已是最新版本"
-      if (isManualCheck) {
-        win.webContents.send('show-message', {
-          type: 'success',
-          message: '已是最新版本',
-        })
-      }
+      win.webContents.send('show-message', {
+        type: 'success',
+        message: '已是最新版本',
+      })
     }
-    isManualCheck = false
   })
 
   // 错误处理（静默处理，记录到日志）
   autoUpdater.on('error', (err) => {
     // 更新错误记录到日志，不显示给用户
     logger.error(`[Update] 更新错误: ${err.message || err}`)
-    isManualCheck = false
   })
 
   // 等待 3 秒再检查更新，确保窗口准备完成，用户进入系统
