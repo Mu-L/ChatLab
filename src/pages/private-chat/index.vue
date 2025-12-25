@@ -14,11 +14,14 @@ import MemberTab from './components/MemberTab.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useSessionStore } from '@/stores/session'
 import { useLayoutStore } from '@/stores/layout'
+import { useYearlyReport } from '@/composables/useYearlyReport'
+import YearlyReviewContainer from './components/yearly-review/YearlyReviewContainer.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sessionStore = useSessionStore()
 const layoutStore = useLayoutStore()
+const { openReport } = useYearlyReport()
 const { currentSessionId } = storeToRefs(sessionStore)
 
 // 打开聊天记录查看器
@@ -215,7 +218,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-gray-50 dark:bg-gray-950">
+  <div class="flex h-full flex-col bg-gray-50 dark:bg-gray-950 relative">
+    <!-- Yearly Review Container -->
+    <YearlyReviewContainer />
+
     <!-- Loading State -->
     <div v-if="isInitialLoad" class="flex h-full items-center justify-center">
       <div class="flex flex-col items-center justify-center text-center">
@@ -261,6 +267,14 @@ onMounted(() => {
               <UIcon :name="tab.icon" class="h-4 w-4" />
               <span class="whitespace-nowrap">{{ tab.label }}</span>
             </button>
+
+            <!-- 年度报告入口 -->
+            <UButton
+              class="ml-2 bg-pink-500 text-white hover:bg-pink-600 border-none shadow-sm px-3 py-2"
+              @click="openReport"
+            >
+              2025年度报告 →
+            </UButton>
           </div>
           <!-- 年份选择器靠右（AI实验室时隐藏） -->
           <UITabs
