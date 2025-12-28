@@ -426,6 +426,17 @@ export async function getRecentMessages(
 }
 
 /**
+ * 获取所有最近消息（消息查看器专用，包含所有类型消息）
+ */
+export async function getAllRecentMessages(
+  sessionId: string,
+  filter?: any,
+  limit?: number
+): Promise<{ messages: SearchMessageResult[]; total: number }> {
+  return sendToWorker('getAllRecentMessages', { sessionId, filter, limit })
+}
+
+/**
  * 获取两个成员之间的对话
  */
 export async function getConversationBetween(

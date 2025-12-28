@@ -113,7 +113,7 @@ const TEXT_ONLY_FILTER = 'AND msg.type = 0 AND msg.content IS NOT NULL AND msg.c
 // ==================== 查询函数 ====================
 
 /**
- * 获取最近的消息
+ * 获取最近的消息（AI Agent 专用，只返回文本消息）
  * @param sessionId 会话 ID
  * @param filter 时间过滤器
  * @param limit 返回数量限制
@@ -177,6 +177,66 @@ export function getRecentMessages(
 }
 
 /**
+ * 获取所有最近的消息（消息查看器专用，包含所有类型消息）
+ * @param sessionId 会话 ID
+ * @param filter 时间过滤器
+ * @param limit 返回数量限制
+ */
+export function getAllRecentMessages(
+  sessionId: string,
+  filter?: TimeFilter,
+  limit: number = 100
+): MessagesWithTotal {
+  // 确保数据库有 avatar 字段（兼容旧数据库）
+  ensureAvatarColumn(sessionId)
+
+  const db = openDatabase(sessionId)
+  if (!db) return { messages: [], total: 0 }
+
+  // 构建时间过滤条件
+  const { clause: timeClause, params: timeParams } = buildTimeFilter(filter)
+  const timeCondition = timeClause ? timeClause.replace('WHERE', 'AND') : ''
+
+  // 查询总数
+  const countSql = `
+    SELECT COUNT(*) as total
+    FROM message msg
+    JOIN member m ON msg.sender_id = m.id
+    WHERE 1=1
+    ${timeCondition}
+  `
+  const totalRow = db.prepare(countSql).get(...timeParams) as { total: number }
+  const total = totalRow?.total || 0
+
+  // 查询最近消息（按时间降序）
+  const sql = `
+    SELECT
+      msg.id,
+      COALESCE(m.group_nickname, m.account_name, m.platform_id) as senderName,
+      m.platform_id as senderPlatformId,
+      m.aliases,
+      m.avatar,
+      msg.content,
+      msg.ts as timestamp,
+      msg.type
+    FROM message msg
+    JOIN member m ON msg.sender_id = m.id
+    WHERE 1=1
+    ${timeCondition}
+    ORDER BY msg.ts DESC
+    LIMIT ?
+  `
+
+  const rows = db.prepare(sql).all(...timeParams, limit) as DbMessageRow[]
+
+  // 返回时按时间正序排列（便于阅读）
+  return {
+    messages: rows.map(sanitizeMessageRow).reverse(),
+    total,
+  }
+}
+
+/**
  * 关键词搜索消息
  * @param sessionId 会话 ID
  * @param keywords 关键词数组（OR 逻辑），可以为空数组
@@ -221,7 +281,6 @@ export function searchMessages(
     JOIN member m ON msg.sender_id = m.id
     WHERE ${keywordCondition}
     ${timeCondition}
-    ${SYSTEM_FILTER}
     ${senderCondition}
   `
   const totalRow = db.prepare(countSql).get(...keywordParams, ...timeParams, ...senderParams) as { total: number }
@@ -242,7 +301,6 @@ export function searchMessages(
     JOIN member m ON msg.sender_id = m.id
     WHERE ${keywordCondition}
     ${timeCondition}
-    ${SYSTEM_FILTER}
     ${senderCondition}
     ORDER BY msg.ts DESC
     LIMIT ? OFFSET ?
@@ -384,7 +442,6 @@ export function getMessagesBefore(
     ${timeCondition}
     ${keywordCondition}
     ${senderCondition}
-    ${SYSTEM_FILTER}
     ORDER BY msg.id DESC
     LIMIT ?
   `
@@ -450,7 +507,6 @@ export function getMessagesAfter(
     ${timeCondition}
     ${keywordCondition}
     ${senderCondition}
-    ${SYSTEM_FILTER}
     ORDER BY msg.id ASC
     LIMIT ?
   `

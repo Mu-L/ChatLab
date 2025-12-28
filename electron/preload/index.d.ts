@@ -159,6 +159,11 @@ interface AiApi {
     filter?: TimeFilter,
     limit?: number
   ) => Promise<{ messages: SearchMessageResult[]; total: number }>
+  getAllRecentMessages: (
+    sessionId: string,
+    filter?: TimeFilter,
+    limit?: number
+  ) => Promise<{ messages: SearchMessageResult[]; total: number }>
   getConversationBetween: (
     sessionId: string,
     memberId1: number,
@@ -380,6 +385,8 @@ interface CacheApi {
     filename: string,
     dataUrl: string
   ) => Promise<{ success: boolean; filePath?: string; error?: string }>
+  getLatestImportLog: () => Promise<{ success: boolean; path?: string; name?: string; error?: string }>
+  showInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>
 }
 
 // Network API 类型 - 网络代理配置

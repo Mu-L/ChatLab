@@ -106,7 +106,7 @@ async function loadInitialMessages() {
       // 没有目标消息和关键词，加载最新的 100 条
       isSearchMode.value = false
       searchOffset.value = 0
-      const result = await window.aiApi.getRecentMessages(sessionId, filter, 100)
+      const result = await window.aiApi.getAllRecentMessages(sessionId, filter, 100)
       messages.value = result.messages
       hasMoreBefore.value = result.messages.length >= 100
       hasMoreAfter.value = false

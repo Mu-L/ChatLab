@@ -501,7 +501,7 @@ const aiApi = {
   },
 
   /**
-   * 获取最近消息
+   * 获取最近消息（AI Agent 专用）
    */
   getRecentMessages: (
     sessionId: string,
@@ -509,6 +509,17 @@ const aiApi = {
     limit?: number
   ): Promise<{ messages: SearchMessageResult[]; total: number }> => {
     return ipcRenderer.invoke('ai:getRecentMessages', sessionId, filter, limit)
+  },
+
+  /**
+   * 获取所有最近消息（消息查看器专用）
+   */
+  getAllRecentMessages: (
+    sessionId: string,
+    filter?: { startTs?: number; endTs?: number },
+    limit?: number
+  ): Promise<{ messages: SearchMessageResult[]; total: number }> => {
+    return ipcRenderer.invoke('ai:getAllRecentMessages', sessionId, filter, limit)
   },
 
   /**

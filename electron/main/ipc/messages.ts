@@ -49,7 +49,7 @@ export function registerMessagesHandlers({ win }: IpcContext): void {
   )
 
   /**
-   * 获取最近消息
+   * 获取最近消息（AI Agent 专用）
    */
   ipcMain.handle(
     'ai:getRecentMessages',
@@ -58,6 +58,21 @@ export function registerMessagesHandlers({ win }: IpcContext): void {
         return await worker.getRecentMessages(sessionId, filter, limit)
       } catch (error) {
         console.error('获取最近消息失败：', error)
+        return { messages: [], total: 0 }
+      }
+    }
+  )
+
+  /**
+   * 获取所有最近消息（消息查看器专用）
+   */
+  ipcMain.handle(
+    'ai:getAllRecentMessages',
+    async (_, sessionId: string, filter?: { startTs?: number; endTs?: number }, limit?: number) => {
+      try {
+        return await worker.getAllRecentMessages(sessionId, filter, limit)
+      } catch (error) {
+        console.error('获取所有最近消息失败：', error)
         return { messages: [], total: 0 }
       }
     }
