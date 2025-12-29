@@ -182,7 +182,6 @@ jobs:
 
           # 生成 release notes
           {
-            echo "## 更新内容"
             echo ""
 
             # 提取 feat commits
