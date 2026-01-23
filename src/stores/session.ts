@@ -194,6 +194,21 @@ export const useSessionStore = defineStore(
       }
     }
 
+    /** 导入诊断信息类型 */
+    interface ImportDiagnosticsInfo {
+      logFile: string | null
+      detectedFormat: string | null
+      messagesReceived: number
+      messagesWritten: number
+      messagesSkipped: number
+      skipReasons: {
+        noSenderId: number
+        noAccountName: number
+        invalidTimestamp: number
+        noType: number
+      }
+    }
+
     /**
      * 从指定路径执行导入（支持拖拽）
      */
@@ -201,6 +216,7 @@ export const useSessionStore = defineStore(
       success: boolean
       error?: string
       diagnosisSuggestion?: string
+      diagnostics?: ImportDiagnosticsInfo
     }> {
       try {
         isImporting.value = true
@@ -278,7 +294,7 @@ export const useSessionStore = defineStore(
             // 不阻断导入流程，用户可以手动生成
           }
 
-          return { success: true }
+          return { success: true, diagnostics: importResult.diagnostics }
         } else {
           // 传递诊断信息（如果有）
           const diagnosisSuggestion = importResult.diagnosis?.suggestion
@@ -286,6 +302,7 @@ export const useSessionStore = defineStore(
             success: false,
             error: importResult.error || 'error.import_failed',
             diagnosisSuggestion,
+            diagnostics: importResult.diagnostics,
           }
         }
       } catch (error) {

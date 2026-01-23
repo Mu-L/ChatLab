@@ -16,14 +16,40 @@ import {
   type ParsedMessage,
 } from '../../parser'
 import { getDbDir } from '../core'
-import { initPerfLog, logPerf, logPerfDetail, resetPerfLog, logInfo, logError, logSummary } from '../core'
+import { initPerfLog, logPerf, logPerfDetail, resetPerfLog, logInfo, logError, logSummary, getCurrentLogFile } from '../core'
 import { sendProgress, generateSessionId, getDbPath, createDatabaseWithoutIndexes, createIndexes } from './utils'
+
+/** 跳过消息的原因统计 */
+export interface SkipReasons {
+  noSenderId: number
+  noAccountName: number
+  invalidTimestamp: number
+  noType: number
+}
+
+/** 导入诊断信息 */
+export interface ImportDiagnostics {
+  /** 日志文件路径 */
+  logFile: string | null
+  /** 检测到的格式 */
+  detectedFormat: string | null
+  /** 收到的消息数 */
+  messagesReceived: number
+  /** 写入的消息数 */
+  messagesWritten: number
+  /** 跳过的消息数 */
+  messagesSkipped: number
+  /** 跳过原因统计 */
+  skipReasons: SkipReasons
+}
 
 /** 流式导入结果 */
 export interface StreamImportResult {
   success: boolean
   sessionId?: string
   error?: string
+  /** 诊断信息（成功或失败时都返回） */
+  diagnostics?: ImportDiagnostics
 }
 
 // ==================== 临时数据库相关（用于合并功能） ====================
@@ -257,16 +283,35 @@ export async function streamImport(filePath: string, requestId: string): Promise
   let shouldDeleteDb = false
   let importError: string | null = null
 
+  // 统计回调调用次数（用于诊断）
+  let callbackStats = {
+    onProgressCalls: 0,
+    onLogCalls: 0,
+    onMetaCalls: 0,
+    onMembersCalls: 0,
+    onMessageBatchCalls: 0,
+    totalMembersReceived: 0,
+    totalMessagesReceived: 0,
+    skippedNoSenderId: 0,
+    skippedNoAccountName: 0,
+    skippedInvalidTimestamp: 0,
+    skippedNoType: 0,
+  }
+
+  logInfo('开始调用 streamParseFile...')
+
   try {
     await streamParseFile(actualFilePath, {
       batchSize: 5000,
 
       onProgress: (progress) => {
+        callbackStats.onProgressCalls++
         // 转发进度到主进程
         sendProgress(requestId, progress)
       },
 
       onLog: (level, message) => {
+        callbackStats.onLogCalls++
         // 将解析器日志写入导入日志文件
         if (level === 'error') {
           logError(message)
@@ -276,8 +321,9 @@ export async function streamImport(filePath: string, requestId: string): Promise
       },
 
       onMeta: (meta: ParsedMeta) => {
+        callbackStats.onMetaCalls++
         if (!metaInserted) {
-          logInfo(`写入 meta: name=${meta.name}, type=${meta.type}`)
+          logInfo(`写入 meta: name=${meta.name}, type=${meta.type}, platform=${meta.platform}`)
           insertMeta.run(
             meta.name,
             meta.platform,
@@ -292,6 +338,9 @@ export async function streamImport(filePath: string, requestId: string): Promise
       },
 
       onMembers: (members: ParsedMember[]) => {
+        callbackStats.onMembersCalls++
+        callbackStats.totalMembersReceived += members.length
+        logInfo(`收到成员批次: ${members.length} 个成员`)
         for (const member of members) {
           insertMember.run(
             member.platformId,
@@ -308,6 +357,13 @@ export async function streamImport(filePath: string, requestId: string): Promise
       },
 
       onMessageBatch: (messages: ParsedMessage[]) => {
+        callbackStats.onMessageBatchCalls++
+        callbackStats.totalMessagesReceived += messages.length
+        // 每收到 10 批消息记录一次日志
+        if (callbackStats.onMessageBatchCalls <= 3 || callbackStats.onMessageBatchCalls % 10 === 0) {
+          logInfo(`收到消息批次 #${callbackStats.onMessageBatchCalls}: ${messages.length} 条消息`)
+        }
+
         // 分阶段计时
         let memberLookupTime = 0
         let memberInsertTime = 0
@@ -318,14 +374,21 @@ export async function streamImport(filePath: string, requestId: string): Promise
         let nicknameChangeCount = 0
 
         for (const msg of messages) {
-          // 数据验证：跳过无效消息
-          if (!msg.senderPlatformId || !msg.senderAccountName) {
+          // 数据验证：跳过无效消息（带统计）
+          if (!msg.senderPlatformId) {
+            callbackStats.skippedNoSenderId++
+            continue
+          }
+          if (!msg.senderAccountName) {
+            callbackStats.skippedNoAccountName++
             continue
           }
           if (msg.timestamp === undefined || msg.timestamp === null || isNaN(msg.timestamp)) {
+            callbackStats.skippedInvalidTimestamp++
             continue
           }
           if (msg.type === undefined || msg.type === null) {
+            callbackStats.skippedNoType++
             continue
           }
 
@@ -572,12 +635,32 @@ export async function streamImport(filePath: string, requestId: string): Promise
     logPerf('WAL checkpoint 完成', totalMessageCount)
     logPerf('导入完成', totalMessageCount)
 
+    // 记录解析器回调统计（诊断信息）
+    logInfo(`=== 解析器回调统计 ===`)
+    logInfo(`onProgress 调用次数: ${callbackStats.onProgressCalls}`)
+    logInfo(`onLog 调用次数: ${callbackStats.onLogCalls}`)
+    logInfo(`onMeta 调用次数: ${callbackStats.onMetaCalls}`)
+    logInfo(`onMembers 调用次数: ${callbackStats.onMembersCalls}, 总成员数: ${callbackStats.totalMembersReceived}`)
+    logInfo(`onMessageBatch 调用次数: ${callbackStats.onMessageBatchCalls}, 总消息数: ${callbackStats.totalMessagesReceived}`)
+    if (
+      callbackStats.skippedNoSenderId > 0 ||
+      callbackStats.skippedNoAccountName > 0 ||
+      callbackStats.skippedInvalidTimestamp > 0 ||
+      callbackStats.skippedNoType > 0
+    ) {
+      logInfo(`=== 消息跳过统计 ===`)
+      if (callbackStats.skippedNoSenderId > 0) logInfo(`  无 senderPlatformId: ${callbackStats.skippedNoSenderId}`)
+      if (callbackStats.skippedNoAccountName > 0) logInfo(`  无 senderAccountName: ${callbackStats.skippedNoAccountName}`)
+      if (callbackStats.skippedInvalidTimestamp > 0) logInfo(`  无效 timestamp: ${callbackStats.skippedInvalidTimestamp}`)
+      if (callbackStats.skippedNoType > 0) logInfo(`  无 type: ${callbackStats.skippedNoType}`)
+    }
+
     // 写入日志摘要
     logSummary(totalMessageCount, memberIdMap.size)
 
     // 检查消息数量，如果为 0 则视为导入失败
     if (totalMessageCount === 0) {
-      logError('导入失败：未解析到任何消息，可能是文件格式不匹配或内容为空')
+      logError(`导入失败：未解析到任何消息 (收到 ${callbackStats.totalMessagesReceived} 条消息，全部被跳过或未收到任何消息)`)
       // 标记需要删除数据库文件（将在 finally 中执行，确保数据库已关闭）
       shouldDeleteDb = true
       importError = 'error.no_messages'
@@ -629,11 +712,30 @@ export async function streamImport(filePath: string, requestId: string): Promise
     }
   }
 
+  // 构造诊断信息
+  const diagnostics: ImportDiagnostics = {
+    logFile: getCurrentLogFile(),
+    detectedFormat: formatFeature ? `${formatFeature.name} (${formatFeature.id})` : null,
+    messagesReceived: callbackStats.totalMessagesReceived,
+    messagesWritten: totalMessageCount,
+    messagesSkipped:
+      callbackStats.skippedNoSenderId +
+      callbackStats.skippedNoAccountName +
+      callbackStats.skippedInvalidTimestamp +
+      callbackStats.skippedNoType,
+    skipReasons: {
+      noSenderId: callbackStats.skippedNoSenderId,
+      noAccountName: callbackStats.skippedNoAccountName,
+      invalidTimestamp: callbackStats.skippedInvalidTimestamp,
+      noType: callbackStats.skippedNoType,
+    },
+  }
+
   // 返回结果（移到 try-catch-finally 之外）
   if (importError) {
-    return { success: false, error: importError }
+    return { success: false, error: importError, diagnostics }
   }
-  return { success: true, sessionId }
+  return { success: true, sessionId, diagnostics }
 }
 
 /** 流式解析文件信息的返回结果 */

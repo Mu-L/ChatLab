@@ -26,6 +26,13 @@ const {
 const importError = ref<string | null>(null)
 const diagnosisSuggestion = ref<string | null>(null)
 const hasImportLog = ref(false)
+const importDiagnostics = ref<{
+  logFile: string | null
+  detectedFormat: string | null
+  messagesReceived: number
+  messagesWritten: number
+  messagesSkipped: number
+} | null>(null)
 
 const router = useRouter()
 
@@ -88,6 +95,7 @@ async function handleClickImport() {
   importError.value = null
   diagnosisSuggestion.value = null
   hasImportLog.value = false
+  importDiagnostics.value = null
 
   // 使用系统对话框选择多个文件
   const result = await window.api.dialog.showOpenDialog({
@@ -116,6 +124,7 @@ async function handleFileDrop({ paths }: { files: File[]; paths: string[] }) {
   importError.value = null
   diagnosisSuggestion.value = null
   hasImportLog.value = false
+  importDiagnostics.value = null
 
   await processFilePaths(paths)
 }
@@ -132,7 +141,20 @@ async function processFilePaths(paths: string[]) {
         if (result.diagnosisSuggestion) {
           diagnosisSuggestion.value = result.diagnosisSuggestion
         }
-        await checkImportLog()
+        // 保存诊断信息
+        if (result.diagnostics) {
+          importDiagnostics.value = {
+            logFile: result.diagnostics.logFile,
+            detectedFormat: result.diagnostics.detectedFormat,
+            messagesReceived: result.diagnostics.messagesReceived,
+            messagesWritten: result.diagnostics.messagesWritten,
+            messagesSkipped: result.diagnostics.messagesSkipped,
+          }
+          // 如果有日志文件，显示查看日志按钮
+          hasImportLog.value = !!result.diagnostics.logFile
+        } else {
+          await checkImportLog()
+        }
       } else if (result.success && sessionStore.currentSessionId) {
         await navigateToSession(sessionStore.currentSessionId)
       }
@@ -558,6 +580,25 @@ const getMergeFileProgressText = (file: MergeFileInfo) =>
       <div class="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
         <UIcon name="i-heroicons-exclamation-circle" class="h-5 w-5 shrink-0" />
         <span>{{ importError }}</span>
+      </div>
+      <!-- 诊断信息（如果有） -->
+      <div
+        v-if="importDiagnostics"
+        class="w-full rounded-md bg-gray-100 px-3 py-2 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+      >
+        <div class="flex items-start gap-2">
+          <UIcon name="i-heroicons-chart-bar" class="mt-0.5 h-4 w-4 shrink-0" />
+          <div class="space-y-1">
+            <div v-if="importDiagnostics.detectedFormat">
+              {{ t('home.import.diagnostics.format') }}{{ importDiagnostics.detectedFormat }}
+            </div>
+            <div>
+              {{ t('home.import.diagnostics.received') }}{{ importDiagnostics.messagesReceived }}
+              {{ t('home.import.diagnostics.written') }}{{ importDiagnostics.messagesWritten }}
+              {{ t('home.import.diagnostics.skipped') }}{{ importDiagnostics.messagesSkipped }}
+            </div>
+          </div>
+        </div>
       </div>
       <!-- 诊断建议（如果有） -->
       <div

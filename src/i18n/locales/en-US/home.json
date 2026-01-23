@@ -41,6 +41,12 @@
       "unrecognized_format": "Unrecognized file format",
       "no_messages": "No messages parsed. Please check if the file format is correct."
     },
+    "diagnostics": {
+      "format": "Format: ",
+      "received": "Received: ",
+      "written": " / Written: ",
+      "skipped": " / Skipped: "
+    },
     "batch": {
       "importing": "Batch importing",
       "progressCount": "{current} of {total}",

@@ -128,7 +128,7 @@ export function registerChatHandlers(ctx: IpcContext): void {
 
       if (result.success) {
         console.log('[IpcMain] Stream import successful, sessionId:', result.sessionId)
-        return { success: true, sessionId: result.sessionId }
+        return { success: true, sessionId: result.sessionId, diagnostics: result.diagnostics }
       } else {
         console.error('[IpcMain] Stream import failed:', result.error)
         win.webContents.send('chat:importProgress', {
@@ -150,10 +150,11 @@ export function registerChatHandlers(ctx: IpcContext): void {
                 missingFields: m.missingFields,
               })),
             },
+            diagnostics: result.diagnostics,
           }
         }
 
-        return { success: false, error: result.error }
+        return { success: false, error: result.error, diagnostics: result.diagnostics }
       }
     } catch (error) {
       console.error('[IpcMain] Import failed:', error)

@@ -58,6 +58,27 @@ interface FormatDiagnosisSimple {
   }>
 }
 
+// 导入诊断信息
+interface ImportDiagnostics {
+  /** 日志文件路径 */
+  logFile: string | null
+  /** 检测到的格式 */
+  detectedFormat: string | null
+  /** 收到的消息数 */
+  messagesReceived: number
+  /** 写入的消息数 */
+  messagesWritten: number
+  /** 跳过的消息数 */
+  messagesSkipped: number
+  /** 跳过原因统计 */
+  skipReasons: {
+    noSenderId: number
+    noAccountName: number
+    invalidTimestamp: number
+    noType: number
+  }
+}
+
 interface ChatApi {
   selectFile: () => Promise<{
     filePath?: string
@@ -70,6 +91,7 @@ interface ChatApi {
     sessionId?: string
     error?: string
     diagnosis?: FormatDiagnosisSimple
+    diagnostics?: ImportDiagnostics
   }>
   getSessions: () => Promise<AnalysisSession[]>
   getSession: (sessionId: string) => Promise<AnalysisSession | null>

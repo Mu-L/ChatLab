@@ -41,6 +41,12 @@
       "unrecognized_format": "无法识别的文件格式",
       "no_messages": "未解析到任何消息，请检查文件格式是否正确"
     },
+    "diagnostics": {
+      "format": "检测格式：",
+      "received": "收到消息：",
+      "written": " / 写入：",
+      "skipped": " / 跳过："
+    },
     "batch": {
       "importing": "正在批量导入",
       "progressCount": "第 {current} 个 / 共 {total} 个",
