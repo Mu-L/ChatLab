@@ -5,6 +5,7 @@
 
 import type { ToolDefinition, ToolCall } from '../llm/types'
 import type { ToolRegistry, RegisteredTool, ToolContext, ToolExecutionResult, ToolExecutor } from './types'
+import { isEmbeddingEnabled } from '../rag'
 
 // 导出类型
 export * from './types'
@@ -45,11 +46,21 @@ export async function ensureToolsInitialized(): Promise<void> {
 
 /**
  * 获取所有已注册的工具定义
+ * 根据配置动态过滤工具（如：语义搜索工具仅在启用 Embedding 时可用）
  * @returns 工具定义数组（用于传给 LLM）
  */
 export async function getAllToolDefinitions(): Promise<ToolDefinition[]> {
   await ensureToolsInitialized()
-  return Array.from(toolRegistry.values()).map((t) => t.definition)
+
+  const allTools = Array.from(toolRegistry.values()).map((t) => t.definition)
+
+  // 根据 Embedding 配置决定是否包含语义搜索工具
+  const embeddingEnabled = isEmbeddingEnabled()
+  if (!embeddingEnabled) {
+    return allTools.filter((t) => t.function.name !== 'semantic_search_messages')
+  }
+
+  return allTools
 }
 
 /**

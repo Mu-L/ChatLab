@@ -852,6 +852,74 @@ interface AIServiceConfigDisplay {
   updatedAt: number
 }
 
+// Embedding 服务配置（多配置模式）
+interface EmbeddingServiceConfig {
+  id: string
+  name: string
+  apiSource: 'reuse_llm' | 'custom'
+  model: string
+  baseUrl?: string
+  apiKey?: string
+  createdAt: number
+  updatedAt: number
+}
+
+// Embedding 配置展示用（隐藏 apiKey）
+interface EmbeddingServiceConfigDisplay {
+  id: string
+  name: string
+  apiSource: 'reuse_llm' | 'custom'
+  model: string
+  baseUrl?: string
+  apiKeySet: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+// 旧版 EmbeddingConfig（兼容）
+interface EmbeddingConfig {
+  enabled: boolean
+  provider: 'api'
+  apiSource?: 'reuse_llm' | 'custom'
+  model?: string
+  baseUrl?: string
+  apiKey?: string
+}
+
+interface VectorStoreConfig {
+  enabled: boolean
+  type: 'memory' | 'sqlite' | 'lancedb'
+  memoryCacheSize?: number
+  dbPath?: string
+}
+
+interface RerankConfig {
+  enabled: boolean
+  provider: 'jina' | 'cohere' | 'bge' | 'custom'
+  model?: string
+  baseUrl?: string
+  apiKey?: string
+  topK?: number
+}
+
+interface RAGConfig {
+  embedding?: EmbeddingConfig
+  vectorStore?: VectorStoreConfig
+  rerank?: RerankConfig
+  enableSemanticPipeline?: boolean
+  candidateLimit?: number
+  topK?: number
+}
+
+interface LocalEmbeddingModel {
+  id: string
+  name: string
+  description: string
+  size: string
+  dimensions: number
+  languages: readonly string[]
+}
+
 const llmApi = {
   /**
    * 获取所有支持的 LLM 提供商
@@ -1326,6 +1394,98 @@ const extendedApi = {
   },
 }
 
+// Embedding API（多配置模式）
+const embeddingApi = {
+  /**
+   * 获取所有 Embedding 配置（展示用）
+   */
+  getAllConfigs: (): Promise<EmbeddingServiceConfigDisplay[]> => {
+    return ipcRenderer.invoke('embedding:getAllConfigs')
+  },
+
+  /**
+   * 获取单个 Embedding 配置（用于编辑）
+   */
+  getConfig: (id: string): Promise<EmbeddingServiceConfig | null> => {
+    return ipcRenderer.invoke('embedding:getConfig', id)
+  },
+
+  /**
+   * 获取激活的配置 ID
+   */
+  getActiveConfigId: (): Promise<string | null> => {
+    return ipcRenderer.invoke('embedding:getActiveConfigId')
+  },
+
+  /**
+   * 检查语义搜索是否启用
+   */
+  isEnabled: (): Promise<boolean> => {
+    return ipcRenderer.invoke('embedding:isEnabled')
+  },
+
+  /**
+   * 设置语义搜索启用状态
+   */
+  setEnabled: (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('embedding:setEnabled', enabled)
+  },
+
+  /**
+   * 添加 Embedding 配置
+   */
+  addConfig: (
+    config: Omit<EmbeddingServiceConfig, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<{ success: boolean; config?: EmbeddingServiceConfig; error?: string }> => {
+    return ipcRenderer.invoke('embedding:addConfig', config)
+  },
+
+  /**
+   * 更新 Embedding 配置
+   */
+  updateConfig: (
+    id: string,
+    updates: Partial<Omit<EmbeddingServiceConfig, 'id' | 'createdAt' | 'updatedAt'>>
+  ): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('embedding:updateConfig', id, updates)
+  },
+
+  /**
+   * 删除 Embedding 配置
+   */
+  deleteConfig: (id: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('embedding:deleteConfig', id)
+  },
+
+  /**
+   * 设置激活的配置
+   */
+  setActiveConfig: (id: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('embedding:setActiveConfig', id)
+  },
+
+  /**
+   * 验证 Embedding 配置
+   */
+  validateConfig: (config: EmbeddingServiceConfig): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('embedding:validateConfig', config)
+  },
+
+  /**
+   * 获取向量存储统计信息
+   */
+  getVectorStoreStats: (): Promise<{ enabled: boolean; count?: number; sizeBytes?: number }> => {
+    return ipcRenderer.invoke('rag:getVectorStoreStats')
+  },
+
+  /**
+   * 清空向量存储
+   */
+  clearVectorStore: (): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('rag:clearVectorStore')
+  },
+}
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -1338,6 +1498,7 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('aiApi', aiApi)
     contextBridge.exposeInMainWorld('llmApi', llmApi)
     contextBridge.exposeInMainWorld('agentApi', agentApi)
+    contextBridge.exposeInMainWorld('embeddingApi', embeddingApi)
     contextBridge.exposeInMainWorld('cacheApi', cacheApi)
     contextBridge.exposeInMainWorld('networkApi', networkApi)
     contextBridge.exposeInMainWorld('sessionApi', sessionApi)
@@ -1359,6 +1520,8 @@ if (process.contextIsolated) {
   window.llmApi = llmApi
   // @ts-ignore (define in dts)
   window.agentApi = agentApi
+  // @ts-ignore (define in dts)
+  window.embeddingApi = embeddingApi
   // @ts-ignore (define in dts)
   window.cacheApi = cacheApi
   // @ts-ignore (define in dts)

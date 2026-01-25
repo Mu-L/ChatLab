@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import AIModelConfigTab from './AI/AIModelConfigTab.vue'
 import AIPromptConfigTab from './AI/AIPromptConfigTab.vue'
 import AIPromptPresetTab from './AI/AIPromptPresetTab.vue'
+import RAGConfigTab from './AI/RAGConfigTab.vue'
 import SubTabs from '@/components/UI/SubTabs.vue'
 import { useSubTabsScroll } from '@/composables/useSubTabsScroll'
 
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 // 导航配置
 const navItems = computed(() => [
   { id: 'model', label: t('settings.tabs.aiConfig') },
+  { id: 'rag', label: t('settings.tabs.aiRAG') },
   { id: 'chat', label: t('settings.tabs.aiPrompt') },
   { id: 'preset', label: t('settings.tabs.aiPreset') },
 ])
@@ -60,6 +62,14 @@ void aiModelConfigRef
         <!-- 模型配置 -->
         <div :ref="(el) => setSectionRef('model', el as HTMLElement)">
           <AIModelConfigTab ref="aiModelConfigRef" @config-changed="handleAIConfigChanged" />
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="border-t border-gray-200 dark:border-gray-700" />
+
+        <!-- RAG 配置 -->
+        <div :ref="(el) => setSectionRef('rag', el as HTMLElement)">
+          <RAGConfigTab @config-changed="handleAIConfigChanged" />
         </div>
 
         <!-- 分隔线 -->

@@ -7,6 +7,8 @@ import { registerTool } from './index'
 import type { ToolDefinition } from '../llm/types'
 import type { ToolContext } from './types'
 import * as workerManager from '../../worker/workerManager'
+import { executeSemanticPipeline, isEmbeddingEnabled } from '../rag'
+import { getDbPath } from '../../database/core'
 
 // ==================== 国际化辅助函数 ====================
 
@@ -916,6 +918,138 @@ async function getSessionMessagesExecutor(
   }
 }
 
+// ==================== 语义搜索工具 ====================
+
+/**
+ * 语义搜索消息工具
+ * 使用 Embedding 向量相似度搜索相关的历史对话
+ */
+const semanticSearchMessagesTool: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'semantic_search_messages',
+    description: `使用 Embedding 向量相似度搜索历史对话，理解语义而非关键词匹配。
+
+⚠️ 使用场景（优先使用 search_messages 关键词搜索，以下场景再考虑本工具）：
+1. 找"类似的话"或"类似的表达"：如"有没有说过类似'我想你了'这样的话"
+2. 关键词搜索结果不足：当 search_messages 返回结果太少或不相关时，可用本工具补充
+3. 模糊的情感/关系分析：如"对方对我的态度是怎样的"、"我们之间的氛围"
+
+❌ 不适合的场景（请用 search_messages）：
+- 有明确关键词的搜索（如"旅游"、"生日"、"加班"）
+- 查找特定人物的发言
+- 查找特定时间段的消息`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: '语义检索查询，用自然语言描述你想要找的内容类型',
+        },
+        top_k: {
+          type: 'number',
+          description: '返回结果数量，默认 10（建议 5-20）',
+        },
+        candidate_limit: {
+          type: 'number',
+          description: '候选会话数量，默认 50（越大越慢但可能更准确）',
+        },
+        year: {
+          type: 'number',
+          description: '筛选指定年份的会话',
+        },
+        month: {
+          type: 'number',
+          description: '筛选指定月份的会话（1-12）',
+        },
+        day: {
+          type: 'number',
+          description: '筛选指定日期的会话（1-31）',
+        },
+        start_time: {
+          type: 'string',
+          description: '开始时间，格式 "YYYY-MM-DD HH:mm"',
+        },
+        end_time: {
+          type: 'string',
+          description: '结束时间，格式 "YYYY-MM-DD HH:mm"',
+        },
+      },
+      required: ['query'],
+    },
+  },
+}
+
+async function semanticSearchMessagesExecutor(
+  params: {
+    query: string
+    top_k?: number
+    candidate_limit?: number
+    year?: number
+    month?: number
+    day?: number
+    start_time?: string
+    end_time?: string
+  },
+  context: ToolContext
+): Promise<unknown> {
+  const { sessionId, timeFilter: contextTimeFilter, locale } = context
+
+  // 检查语义搜索是否启用
+  if (!isEmbeddingEnabled()) {
+    return {
+      error: isChineseLocale(locale)
+        ? '语义搜索未启用。请在设置中添加并启用 Embedding 配置。'
+        : 'Semantic search is not enabled. Please add and enable an Embedding config in settings.',
+    }
+  }
+
+  // 使用扩展的时间参数解析
+  const effectiveTimeFilter = parseExtendedTimeParams(params, contextTimeFilter)
+
+  // 获取数据库路径
+  const dbPath = getDbPath(sessionId)
+
+  // 执行语义搜索
+  const result = await executeSemanticPipeline({
+    userMessage: params.query,
+    dbPath,
+    timeFilter: effectiveTimeFilter,
+    candidateLimit: params.candidate_limit,
+    topK: params.top_k,
+  })
+
+  if (!result.success) {
+    return {
+      error: result.error || (isChineseLocale(locale) ? '语义搜索失败' : 'Semantic search failed'),
+    }
+  }
+
+  if (result.results.length === 0) {
+    return {
+      message: isChineseLocale(locale) ? '未找到相关的历史对话' : 'No relevant conversations found',
+      rewrittenQuery: result.rewrittenQuery,
+    }
+  }
+
+  // 格式化结果
+  return {
+    total: result.results.length,
+    rewrittenQuery: result.rewrittenQuery,
+    timeRange: formatTimeRange(effectiveTimeFilter, locale),
+    results: result.results.map((r, i) => ({
+      rank: i + 1,
+      score: `${(r.score * 100).toFixed(1)}%`,
+      sessionId: r.metadata?.sessionId,
+      timeRange: r.metadata
+        ? formatTimeRange({ startTs: r.metadata.startTs, endTs: r.metadata.endTs }, locale)
+        : undefined,
+      participants: r.metadata?.participants,
+      content: r.content.length > 500 ? r.content.slice(0, 500) + '...' : r.content,
+    })),
+  }
+}
+
 // ==================== 注册工具 ====================
 
 registerTool(searchMessagesTool, searchMessagesExecutor)
@@ -928,3 +1062,4 @@ registerTool(getConversationBetweenTool, getConversationBetweenExecutor)
 registerTool(getMessageContextTool, getMessageContextExecutor)
 registerTool(searchSessionsTool, searchSessionsExecutor)
 registerTool(getSessionMessagesTool, getSessionMessagesExecutor)
+registerTool(semanticSearchMessagesTool, semanticSearchMessagesExecutor)

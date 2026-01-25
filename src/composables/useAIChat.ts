@@ -87,6 +87,7 @@ const TOOL_DISPLAY_NAMES_I18N: Record<string, Record<string, string>> = {
     get_member_name_history: '获取昵称历史',
     get_conversation_between: '获取对话记录',
     get_message_context: '获取上下文',
+    semantic_search_messages: '🔍 语义搜索',
   },
   'en-US': {
     search_messages: 'Search Messages',
@@ -97,6 +98,7 @@ const TOOL_DISPLAY_NAMES_I18N: Record<string, Record<string, string>> = {
     get_member_name_history: 'Get Nickname History',
     get_conversation_between: 'Get Conversation',
     get_message_context: 'Get Message Context',
+    semantic_search_messages: '🔍 Semantic Search',
   },
 }
 
