@@ -16,14 +16,15 @@ export {
   getMessageTypeDistribution,
   getTimeRange,
   getMemberNameHistory,
-  getAllSessions,
-  getSession,
   // 成员管理
   getMembers,
   getMembersPaginated,
   updateMemberAliases,
   deleteMember,
 } from './basic'
+
+// 会话管理（会话列表与基础信息）
+export { getAllSessions, getSession } from './sessions'
 
 // 成员分页类型
 export type { MembersPaginationParams, MembersPaginatedResult } from './basic'
