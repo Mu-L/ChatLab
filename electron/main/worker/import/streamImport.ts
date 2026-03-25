@@ -17,6 +17,7 @@ import {
   type ParsedMessage,
   type FormatFeature,
 } from '../../parser'
+import { ChatType } from '../../../../src/types/base'
 import { getDbDir } from '../core'
 import {
   initPerfLog,
@@ -876,7 +877,7 @@ export async function streamParseFileInfo(filePath: string, requestId: string): 
     VALUES (?, ?, ?, ?, ?, ?)
   `)
 
-  let meta: ParsedMeta = { name: '未知群聊', platform: formatFeature.platform, type: 'group' }
+  let meta: ParsedMeta = { name: '未知群聊', platform: formatFeature.platform, type: ChatType.GROUP }
   const memberSet = new Set<string>()
   let messageCount = 0
   let metaInserted = false

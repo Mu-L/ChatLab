@@ -5,9 +5,6 @@
 
 import { openDatabase } from '../core'
 
-// 查询超时时间（毫秒）
-const QUERY_TIMEOUT_MS = 10000
-
 /**
  * SQL 执行结果
  */
@@ -104,13 +101,6 @@ export function executePluginQuery<T = Record<string, any>>(
     return stmt.all(...params) as T[]
   }
   return stmt.all(params) as T[]
-}
-
-/**
- * 检查 SQL 是否包含 LIMIT 子句
- */
-function hasLimit(sql: string): boolean {
-  return /\bLIMIT\s+\d+/i.test(sql)
 }
 
 /**

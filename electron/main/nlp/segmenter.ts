@@ -32,7 +32,11 @@ function getJieba(): JiebaInstance {
       throw new Error('jieba 模块加载失败')
     }
   }
-  return jiebaInstance
+  const instance = jiebaInstance
+  if (!instance) {
+    throw new Error('jieba 模块未初始化')
+  }
+  return instance
 }
 
 /**

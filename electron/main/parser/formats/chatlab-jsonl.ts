@@ -18,7 +18,7 @@
 import * as fs from 'fs'
 import * as readline from 'readline'
 import * as path from 'path'
-import { KNOWN_PLATFORMS, ChatType, MessageType, type ChatPlatform } from '../../../../src/types/base'
+import { KNOWN_PLATFORMS, ChatType, MessageType } from '../../../../src/types/base'
 import type {
   FormatFeature,
   FormatModule,
@@ -29,12 +29,9 @@ import type {
   ParsedMember,
   ParsedMessage,
 } from '../types'
-import { getFileSize, createProgress, readFileHeadBytes } from '../utils'
+import { getFileSize, createProgress } from '../utils'
 
 // ==================== JSONL 行类型定义 ====================
-
-/** JSONL 行类型 */
-type JsonlLineType = 'header' | 'member' | 'message'
 
 /** Header 行结构 */
 interface JsonlHeader {

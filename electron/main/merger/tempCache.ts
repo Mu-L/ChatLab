@@ -6,8 +6,8 @@
 import Database from 'better-sqlite3'
 import * as fs from 'fs'
 import * as path from 'path'
-import type { ParsedMember, ParsedMessage } from '../../../src/types/base'
-import type { ParseResult, ParsedMeta } from '../parser/types'
+import { ChatType, type ParsedMember, type ParsedMessage } from '../../../src/types/base'
+import type { ParsedMeta } from '../parser/types'
 import { getTempDir as getAppTempDir, ensureDir } from '../paths'
 
 /**
@@ -201,7 +201,7 @@ export class TempDbReader {
     return {
       name: row.name,
       platform: row.platform,
-      type: row.type as 'group' | 'private',
+      type: row.type === ChatType.PRIVATE ? ChatType.PRIVATE : ChatType.GROUP,
       groupId: row.group_id || undefined,
       groupAvatar: row.group_avatar || undefined,
     }
@@ -264,8 +264,8 @@ export class TempDbReader {
         senderAccountName: r.sender_account_name || r.sender_platform_id,
         senderGroupNickname: r.sender_group_nickname || undefined,
         timestamp: r.timestamp,
-        type: r.type,
-        content: r.content || undefined,
+        type: r.type as ParsedMessage['type'],
+        content: r.content,
       }))
 
       callback(messages)
@@ -300,8 +300,8 @@ export class TempDbReader {
       senderAccountName: r.sender_account_name || r.sender_platform_id,
       senderGroupNickname: r.sender_group_nickname || undefined,
       timestamp: r.timestamp,
-      type: r.type,
-      content: r.content || undefined,
+      type: r.type as ParsedMessage['type'],
+      content: r.content,
     }))
   }
 

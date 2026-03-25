@@ -9,21 +9,14 @@ import { parseFileSync, detectFormat } from '../parser'
 import { importData } from '../database/core'
 import { TempDbReader } from './tempCache'
 import { getDownloadsDir } from '../paths'
+import type { ParseResult, ParsedMessage, ChatPlatform, ChatType, ParsedMember } from '../../../src/types/base'
 import type {
-  ParseResult,
-  ParsedMessage,
   ChatLabFormat,
   ChatLabMember,
   ChatLabMessage,
   FileParseInfo,
   MergeConflict,
-  ChatPlatform,
-  ChatType,
-  ParsedMember,
-} from '../../../src/types/base'
-import type {
   ConflictCheckResult,
-  ConflictResolution,
   MergeParams,
   MergeResult,
   MergeSource,
@@ -81,6 +74,10 @@ export async function parseFileInfo(filePath: string): Promise<FileParseInfo> {
  */
 function getMessageKey(msg: ParsedMessage): string {
   return `${msg.timestamp}_${msg.senderPlatformId}_${(msg.content || '').length}`
+}
+
+function getParsedMessageDisplayName(msg: ParsedMessage): string {
+  return msg.senderGroupNickname || msg.senderAccountName || msg.senderPlatformId
 }
 
 /**
@@ -191,7 +188,7 @@ function detectConflictsInMessages(
             if (conflicts.length < 5) {
               console.log(`[Merger] Conflict #${conflicts.length + 1}:`)
               console.log(`  Timestamp: ${ts} (${new Date(ts * 1000).toLocaleString()})`)
-              console.log(`  Sender: ${sender} (${item1.msg.senderName})`)
+              console.log(`  Sender: ${sender} (${getParsedMessageDisplayName(item1.msg)})`)
               console.log(
                 `  File1: ${item1.source}, length: ${content1.length}, content: "${content1.slice(0, 50)}..."`
               )
@@ -203,7 +200,7 @@ function detectConflictsInMessages(
             conflicts.push({
               id: `conflict_${ts}_${sender}_${conflicts.length}`,
               timestamp: ts,
-              sender: item1.msg.senderName || sender,
+              sender: getParsedMessageDisplayName(item1.msg) || sender,
               contentLength1: content1.length,
               contentLength2: content2.length,
               content1: content1,
@@ -266,6 +263,128 @@ export async function mergeFilesWithCache(params: MergeParams, cache: Map<string
       success: false,
       error: err instanceof Error ? err.message : '合并失败',
     }
+  }
+}
+
+async function executeMerge(
+  parseResults: Array<{ result: ParseResult; source: string }>,
+  outputName: string,
+  outputDir: string | undefined,
+  _conflictResolutions: MergeParams['conflictResolutions'],
+  andAnalyze: boolean
+): Promise<MergeResult> {
+  const memberMap = new Map<string, ChatLabMember>()
+  for (const { result } of parseResults) {
+    for (const member of result.members) {
+      const existing = memberMap.get(member.platformId)
+      if (existing) {
+        if (member.accountName) existing.accountName = member.accountName
+        if (member.groupNickname) existing.groupNickname = member.groupNickname
+        if (member.avatar) existing.avatar = member.avatar
+      } else {
+        memberMap.set(member.platformId, {
+          platformId: member.platformId,
+          accountName: member.accountName,
+          groupNickname: member.groupNickname,
+          avatar: member.avatar,
+        })
+      }
+    }
+  }
+
+  const seenKeys = new Set<string>()
+  const mergedMessages: ChatLabMessage[] = []
+  for (const { result } of parseResults) {
+    for (const msg of result.messages) {
+      const key = getMessageKey(msg)
+      if (seenKeys.has(key)) continue
+      seenKeys.add(key)
+
+      mergedMessages.push({
+        sender: msg.senderPlatformId,
+        accountName: msg.senderAccountName,
+        groupNickname: msg.senderGroupNickname,
+        timestamp: msg.timestamp,
+        type: msg.type,
+        content: msg.content,
+      })
+    }
+  }
+
+  mergedMessages.sort((a, b) => a.timestamp - b.timestamp)
+
+  const sources: MergeSource[] = parseResults.map(({ result, source }) => ({
+    filename: source,
+    platform: result.meta.platform,
+    messageCount: result.messages.length,
+  }))
+
+  const groupIds = new Set(parseResults.map(({ result }) => result.meta.groupId).filter(Boolean))
+  const groupId =
+    groupIds.size === 1 ? parseResults.find(({ result }) => result.meta.groupId)?.result.meta.groupId : undefined
+  const groupAvatar = groupId
+    ? parseResults.filter(({ result }) => result.meta.groupId === groupId).pop()?.result.meta.groupAvatar
+    : undefined
+
+  const chatLabHeader = {
+    version: '0.0.1',
+    exportedAt: Math.floor(Date.now() / 1000),
+    generator: 'ChatLab Merge Tool',
+    description: `合并自 ${parseResults.length} 个文件`,
+  }
+
+  const chatLabMeta = {
+    name: outputName,
+    platform: parseResults[0].result.meta.platform as ChatPlatform,
+    type: parseResults[0].result.meta.type as ChatType,
+    sources,
+    groupId,
+    groupAvatar,
+  }
+
+  const targetDir = outputDir || getDefaultOutputDir()
+  ensureOutputDir(targetDir)
+  const outputPath = path.join(targetDir, generateOutputFilename(outputName, 'json'))
+
+  const chatLabData: ChatLabFormat = {
+    chatlab: chatLabHeader,
+    meta: chatLabMeta,
+    members: Array.from(memberMap.values()),
+    messages: mergedMessages,
+  }
+  fs.writeFileSync(outputPath, JSON.stringify(chatLabData, null, 2), 'utf-8')
+
+  let sessionId: string | undefined
+  if (andAnalyze) {
+    sessionId = importData({
+      meta: {
+        name: chatLabMeta.name,
+        platform: chatLabMeta.platform,
+        type: chatLabMeta.type,
+        groupId: chatLabMeta.groupId,
+        groupAvatar: chatLabMeta.groupAvatar,
+      },
+      members: chatLabData.members.map((member) => ({
+        platformId: member.platformId,
+        accountName: member.accountName,
+        groupNickname: member.groupNickname,
+        avatar: member.avatar,
+      })),
+      messages: chatLabData.messages.map((msg) => ({
+        senderPlatformId: msg.sender,
+        senderAccountName: msg.accountName,
+        senderGroupNickname: msg.groupNickname,
+        timestamp: msg.timestamp,
+        type: msg.type,
+        content: msg.content,
+      })),
+    })
+  }
+
+  return {
+    success: true,
+    outputPath,
+    sessionId,
   }
 }
 
@@ -344,7 +463,14 @@ export async function mergeFilesWithTempDb(
   params: MergeParams,
   tempDbCache: Map<string, string>
 ): Promise<MergeResult> {
-  const { filePaths, outputName, outputDir, outputFormat = 'json', conflictResolutions, andAnalyze } = params
+  const {
+    filePaths,
+    outputName,
+    outputDir,
+    outputFormat = 'json',
+    conflictResolutions: _conflictResolutions,
+    andAnalyze,
+  } = params
 
   console.log('[Merger] mergeFilesWithTempDb: Starting merge')
   console.log(
@@ -685,17 +811,17 @@ export async function exportSessionToTempFile(sessionId: string): Promise<string
       },
       members: members.map((m) => ({
         platformId: m.platform_id,
-        accountName: m.account_name,
-        groupNickname: m.group_nickname,
+        accountName: m.account_name || m.platform_id,
+        groupNickname: m.group_nickname || undefined,
         avatar: m.avatar,
       })),
       messages: messages.map((msg) => ({
         sender: msg.sender,
-        accountName: msg.accountName,
-        groupNickname: msg.groupNickname,
+        accountName: msg.accountName || msg.sender,
+        groupNickname: msg.groupNickname || undefined,
         timestamp: msg.timestamp,
-        type: msg.type,
-        content: msg.content,
+        type: msg.type as ChatLabMessage['type'],
+        content: msg.content ?? null,
       })),
     }
 

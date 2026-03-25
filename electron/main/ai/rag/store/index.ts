@@ -32,7 +32,7 @@ export async function getVectorStore(): Promise<IVectorStore | null> {
     activeStore = await createVectorStore(config.vectorStore)
     return activeStore
   } catch (error) {
-    logger.error('[Store Manager] Failed to create store:', error)
+    logger.error('Store Manager', 'Failed to create store', error)
     return null
   }
 }
@@ -44,13 +44,13 @@ async function createVectorStore(config: VectorStoreConfig): Promise<IVectorStor
   switch (config.type) {
     case 'memory': {
       const capacity = config.memoryCacheSize || 10000
-      logger.info(`[Store Manager] Using memory store, capacity: ${capacity}`)
+      logger.info('Store Manager', `Using memory store, capacity: ${capacity}`)
       return new MemoryVectorStore(capacity)
     }
 
     case 'sqlite': {
       const dbPath = config.dbPath || path.join(getVectorStoreDir(), 'embeddings.db')
-      logger.info(`[Store Manager] Using SQLite store: ${dbPath}`)
+      logger.info('Store Manager', `Using SQLite store: ${dbPath}`)
       return new SQLiteVectorStore(dbPath)
     }
 
@@ -72,7 +72,7 @@ export async function resetVectorStore(): Promise<void> {
   if (activeStore) {
     await activeStore.close()
     activeStore = null
-    logger.info('[Store Manager] Store reset')
+    logger.info('Store Manager', 'Store reset')
   }
 }
 

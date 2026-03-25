@@ -24,7 +24,8 @@ export interface ParsedMeta {
  */
 export interface ParseProgress {
   /** 阶段 */
-  stage: 'detecting' | 'parsing' | 'done' | 'error'
+  // 导入流程会复用解析进度结构，因此这里补充导入阶段枚举。
+  stage: 'detecting' | 'parsing' | 'importing' | 'saving' | 'done' | 'error'
   /** 已读取字节数 */
   bytesRead: number
   /** 文件总字节数 */
@@ -96,7 +97,7 @@ export interface FormatFeature {
 // ==================== 解析层：解析器接口 ====================
 
 /** 日志级别 */
-export type LogLevel = 'info' | 'error'
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 /**
  * 解析选项

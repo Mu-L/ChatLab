@@ -79,7 +79,7 @@ export class SQLiteVectorStore implements IVectorStore {
       // 索引可能已存在
     }
 
-    logger.info(`[SQLite Store] Initialized: ${this.dbPath}`)
+    logger.info('SQLite Store', `Initialized: ${this.dbPath}`)
   }
 
   /**
@@ -107,8 +107,9 @@ export class SQLiteVectorStore implements IVectorStore {
       VALUES (?, ?, ?, ?)
     `)
 
-    const insertMany = this.db.transaction((items: typeof items) => {
-      for (const item of items) {
+    type VectorBatchItem = { id: string; vector: number[]; metadata?: Record<string, unknown> }
+    const insertMany = this.db.transaction((batchItems: VectorBatchItem[]) => {
+      for (const item of batchItems) {
         const buffer = vectorToBuffer(item.vector)
         insert.run(item.id, buffer, item.vector.length, item.metadata ? JSON.stringify(item.metadata) : null)
       }
@@ -180,7 +181,7 @@ export class SQLiteVectorStore implements IVectorStore {
    */
   async clear(): Promise<void> {
     this.db.exec('DELETE FROM vectors')
-    logger.info('[SQLite Store] All vectors cleared')
+    logger.info('SQLite Store', 'All vectors cleared')
   }
 
   /**
@@ -214,6 +215,6 @@ export class SQLiteVectorStore implements IVectorStore {
    */
   async close(): Promise<void> {
     this.db.close()
-    logger.info('[SQLite Store] Closed')
+    logger.info('SQLite Store', 'Closed')
   }
 }

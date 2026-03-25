@@ -237,7 +237,7 @@ class MainProcess {
       })
 
       // 监听渲染进程崩溃
-      app.on('render-process-gone', (e, w, d) => {
+      app.on('render-process-gone', (_event, w, d) => {
         if (d.reason == 'crashed') {
           w.reload()
         }

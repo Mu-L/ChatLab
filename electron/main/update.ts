@@ -218,7 +218,7 @@ const checkUpdate = (win) => {
   })
 
   // 不需要更新
-  autoUpdater.on('update-not-available', (info) => {
+  autoUpdater.on('update-not-available', (_info) => {
     // 客户端打开会默认弹一次，用isFirstShow来控制不弹
     if (isFirstShow) {
       isFirstShow = false
@@ -283,7 +283,7 @@ const manualCheckForUpdates = () => {
  * 模拟更新弹窗（仅用于开发测试）
  * 控制台通过：window.api.app.simulateUpdate() 测试
  */
-const simulateUpdateDialog = (win) => {
+const simulateUpdateDialog = (_win) => {
   dialog.showMessageBox({
     title: t('update.newVersionTitle', { version: '9.9.9' }),
     message: t('update.newVersionMessage', { version: '9.9.9' }),

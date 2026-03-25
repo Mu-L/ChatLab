@@ -3,7 +3,7 @@
  */
 
 import * as fs from 'fs'
-import type { ParseProgress, CreateProgress } from './types'
+import type { CreateProgress } from './types'
 
 /**
  * 获取文件大小

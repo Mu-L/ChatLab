@@ -8,7 +8,7 @@ import * as worker from '../worker/workerManager'
 import * as parser from '../parser'
 import { detectFormat, diagnoseFormat, scanMultiChatFile, type ParseProgress } from '../parser'
 import type { IpcContext } from './types'
-import { CURRENT_SCHEMA_VERSION, getPendingMigrationInfos, type MigrationInfo } from '../database/migrations'
+import { CURRENT_SCHEMA_VERSION, getPendingMigrationInfos } from '../database/migrations'
 import { exportSessionToTempFile, cleanupTempExportFiles } from '../merger'
 import { t } from '../i18n'
 

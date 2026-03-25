@@ -227,6 +227,9 @@ export async function incrementalImport(
         if (processedCount % BATCH_SIZE === 0) {
           sendProgress(requestId, {
             stage: 'saving',
+            bytesRead: 0,
+            totalBytes: 0,
+            messagesProcessed: processedCount,
             percentage: 50, // 实际进度难以计算，使用固定值
             message: `已处理 ${processedCount} 条，新增 ${newMessageCount} 条`,
           })
@@ -244,6 +247,9 @@ export async function incrementalImport(
 
     sendProgress(requestId, {
       stage: 'done',
+      bytesRead: 0,
+      totalBytes: 0,
+      messagesProcessed: processedCount,
       percentage: 100,
       message: `导入完成，新增 ${newMessageCount} 条消息`,
     })

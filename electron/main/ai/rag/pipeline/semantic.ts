@@ -62,7 +62,7 @@ async function rewriteQuery(query: string, abortSignal?: AbortSignal): Promise<s
 
     return rewritten || query
   } catch (error) {
-    logger.warn('[Semantic Pipeline] Query rewrite failed, using original query:', error)
+    logger.warn('Semantic Pipeline', 'Query rewrite failed, using original query', error)
     return query
   }
 }
@@ -197,7 +197,8 @@ export async function executeSemanticPipeline(options: SemanticPipelineOptions):
         chunkVectors.set(chunk.id, vector)
 
         if (vectorStore) {
-          await vectorStore.add(chunk.id, vector, chunk.metadata as Record<string, unknown>)
+          // ChunkMetadata 是结构化对象，这里仅在向量存储层按通用元数据字典处理。
+          await vectorStore.add(chunk.id, vector, chunk.metadata as unknown as Record<string, unknown>)
         }
       }
     }

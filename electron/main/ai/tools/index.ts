@@ -142,7 +142,7 @@ function wrapWithPreprocessing(tool: AgentTool<any>, context: ToolContext): Agen
   const originalExecute = tool.execute
   return {
     ...tool,
-    execute: async (toolCallId: string, params: any) => {
+    execute: async (toolCallId: string, params: any, _signal?: AbortSignal, _onUpdate?: unknown) => {
       const result = await originalExecute(toolCallId, params)
 
       const details = result.details as Record<string, unknown> | undefined
@@ -160,8 +160,8 @@ function wrapWithPreprocessing(tool: AgentTool<any>, context: ToolContext): Agen
 
       const formatted = processed.map((m) => formatMessageCompact(m, context.locale))
 
-      const finalDetails = { ...details, messages: formatted, returned: processed.length }
-      delete finalDetails.rawMessages
+      const { rawMessages: _rawMessages, ...restDetails } = details
+      const finalDetails = { ...restDetails, messages: formatted, returned: processed.length }
 
       let textContent = formatToolResultAsText(finalDetails)
       if (nameMapLine) {
@@ -242,6 +242,7 @@ export function createActivateSkillTool(
 
   return {
     name: 'activate_skill',
+    label: 'activate_skill',
     description: isZh
       ? '激活一个分析技能，获取该技能的详细执行指导'
       : 'Activate an analysis skill and get its detailed execution instructions',
@@ -255,11 +256,12 @@ export function createActivateSkillTool(
       },
       required: ['skill_id'],
     },
-    execute: async (_toolCallId: string, params: { skill_id: string }) => {
+    execute: async (_toolCallId: string, params: { skill_id: string }, _signal?: AbortSignal, _onUpdate?: unknown) => {
       const skill: SkillDef | null = getSkillConfig(params.skill_id)
       if (!skill) {
         return {
           content: [{ type: 'text' as const, text: isZh ? '技能不存在' : 'Skill not found' }],
+          details: { skillId: params.skill_id, found: false },
         }
       }
 
@@ -267,7 +269,10 @@ export function createActivateSkillTool(
         const scopeMsg = isZh
           ? `该技能仅适用于${skill.chatScope === 'group' ? '群聊' : '私聊'}场景`
           : `This skill is only applicable to ${skill.chatScope === 'group' ? 'group chat' : 'private chat'} scenarios`
-        return { content: [{ type: 'text' as const, text: scopeMsg }] }
+        return {
+          content: [{ type: 'text' as const, text: scopeMsg }],
+          details: { skillId: params.skill_id, found: true, applicable: false },
+        }
       }
 
       if (skill.tools.length > 0 && allowedTools && allowedTools.length > 0) {
@@ -276,7 +281,10 @@ export function createActivateSkillTool(
           const msg = isZh
             ? `当前助手缺少该技能所需的工具：${missing.join(', ')}`
             : `Current assistant lacks tools required by this skill: ${missing.join(', ')}`
-          return { content: [{ type: 'text' as const, text: msg }] }
+          return {
+            content: [{ type: 'text' as const, text: msg }],
+            details: { skillId: params.skill_id, found: true, applicable: false, missingTools: missing },
+          }
         }
       }
 
@@ -286,6 +294,7 @@ export function createActivateSkillTool(
 
       return {
         content: [{ type: 'text' as const, text: `${skill.prompt}${actionPrompt}` }],
+        details: { skillId: params.skill_id, found: true, applicable: true },
       }
     },
   }

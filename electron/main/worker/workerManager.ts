@@ -7,6 +7,7 @@ import { Worker } from 'worker_threads'
 import { app } from 'electron'
 import * as path from 'path'
 import type { ParseProgress } from '../parser'
+import type { StreamImportResult } from './import'
 import { getDatabaseDir, ensureDir } from '../paths'
 
 // Worker 实例
@@ -333,10 +334,11 @@ export async function closeDatabase(sessionId: string): Promise<void> {
 export interface MemberWithStats {
   id: number
   platformId: string
-  name: string
-  nickname: string | null
+  accountName: string | null
+  groupNickname: string | null
   aliases: string[]
   messageCount: number
+  avatar?: string | null
 }
 
 /**
@@ -410,7 +412,7 @@ export async function streamImport(
   filePath: string,
   onProgress?: (progress: ParseProgress) => void,
   formatOptions?: Record<string, unknown>
-): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+): Promise<StreamImportResult> {
   return sendToWorkerWithProgress('streamImport', { filePath, formatOptions }, onProgress)
 }
 

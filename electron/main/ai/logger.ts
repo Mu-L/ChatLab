@@ -5,7 +5,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { getLogsDir, ensureDir } from '../paths'
+import { getLogsDir } from '../paths'
 
 let debugMode = false
 

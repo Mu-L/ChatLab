@@ -11,6 +11,7 @@ import type {
   ParseEvent,
   ParseResult,
   ParseProgress,
+  LogLevel,
   FormatFeature,
   Parser,
   ParsedMeta,
@@ -288,7 +289,7 @@ export interface StreamParseCallbacks {
   onMembers: (members: ParsedMember[]) => void
   onMessageBatch: (messages: ParsedMessage[]) => void
   /** 日志回调（可选） */
-  onLog?: (level: 'info' | 'error', message: string) => void
+  onLog?: (level: LogLevel, message: string) => void
 }
 
 export interface StreamParseOptions extends StreamParseCallbacks {

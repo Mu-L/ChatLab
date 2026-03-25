@@ -26,7 +26,9 @@ export const i18nTexts = {
   },
 }
 
-export function t(key: keyof typeof i18nTexts, locale?: string): string | string[] {
+type TextEntryKey = Exclude<keyof typeof i18nTexts, 'dailySummary'>
+
+export function t(key: TextEntryKey, locale?: string): string | string[] {
   const text = i18nTexts[key]
   if (typeof text === 'object' && 'zh' in text && 'en' in text) {
     return isChineseLocale(locale) ? text.zh : text.en

@@ -362,7 +362,7 @@ function cleanupTempFile(filePath: string): void {
  * QQ Chat Exporter 预处理器
  */
 export const qqPreprocessor: Preprocessor = {
-  needsPreprocess(filePath: string, fileSize: number): boolean {
+  needsPreprocess(_filePath: string, fileSize: number): boolean {
     return fileSize > PREPROCESS_THRESHOLD
   },
 

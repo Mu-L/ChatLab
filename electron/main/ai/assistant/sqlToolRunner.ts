@@ -5,8 +5,9 @@
  * 通过 pluginQuery 执行参数化 SQL 并格式化结果。
  */
 
-import { Type, type TObject, type TProperties } from '@mariozechner/pi-ai'
-import type { AgentTool } from '@mariozechner/pi-agent-core'
+import { Type } from '@mariozechner/pi-ai'
+import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core'
+import type { TSchema } from '@sinclair/typebox'
 import type { ToolContext } from '../tools/types'
 import type { CustomSqlToolDef, JsonSchemaObject } from './types'
 import * as workerManager from '../../worker/workerManager'
@@ -17,8 +18,8 @@ import { t as i18nT } from '../../i18n'
  *
  * 仅覆盖 SQL 工具参数定义的常见类型（string / number / integer / boolean）。
  */
-export function jsonSchemaToTypeBox(schema: JsonSchemaObject): TObject<TProperties> {
-  const props: TProperties = {}
+export function jsonSchemaToTypeBox(schema: JsonSchemaObject) {
+  const props: Record<string, TSchema> = {}
 
   for (const [key, prop] of Object.entries(schema.properties)) {
     const isRequired = schema.required?.includes(key) ?? false
@@ -77,13 +78,21 @@ export function createSqlTool(def: CustomSqlToolDef, context: ToolContext): Agen
     label: def.name,
     description: def.description,
     parameters: schema,
-    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+    execute: async (
+      _toolCallId: string,
+      params: Record<string, unknown>,
+      _signal?: AbortSignal,
+      _onUpdate?: unknown
+    ): Promise<AgentToolResult<{ rows: Record<string, unknown>[]; rowCount: number }>> => {
       const rows = await workerManager.pluginQuery(context.sessionId, def.execution.query, params)
 
       const fallback = resolveTemplate(def.name, 'fallback', def.execution.fallback)
 
       if (!rows || rows.length === 0) {
-        return { content: [{ type: 'text' as const, text: fallback }] }
+        return {
+          content: [{ type: 'text' as const, text: fallback }],
+          details: { rows: [], rowCount: 0 },
+        }
       }
 
       const rowTemplate = resolveTemplate(def.name, 'rowTemplate', def.execution.rowTemplate)
@@ -102,7 +111,10 @@ export function createSqlTool(def: CustomSqlToolDef, context: ToolContext): Agen
         lines.push(formatRow(rowTemplate, row as Record<string, unknown>))
       }
 
-      return { content: [{ type: 'text' as const, text: lines.join('\n') }] }
+      return {
+        content: [{ type: 'text' as const, text: lines.join('\n') }],
+        details: { rows, rowCount: rows.length },
+      }
     },
   }
 }

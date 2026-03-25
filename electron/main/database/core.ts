@@ -6,7 +6,7 @@
 import Database from 'better-sqlite3'
 import * as fs from 'fs'
 import * as path from 'path'
-import type { DbMeta, ParseResult, AnalysisSession } from '../../../src/types/base'
+import type { ParseResult } from '../../../src/types/base'
 import { migrateDatabase, needsMigration, CURRENT_SCHEMA_VERSION } from './migrations'
 import { getDatabaseDir, ensureDir } from '../paths'
 
@@ -162,7 +162,6 @@ export function openDatabaseWithMigration(sessionId: string, forceRepair = false
  */
 export function importData(parseResult: ParseResult): string {
   const sessionId = generateSessionId()
-  const dbPath = getDbPath(sessionId)
   const db = createDatabase(sessionId)
 
   try {
@@ -293,17 +292,12 @@ export function importData(parseResult: ParseResult): string {
     })
 
     importTransaction()
-
-    const fileExists = fs.existsSync(dbPath)
-
     return sessionId
   } catch (error) {
     console.error('[Database] Error in importData:', error)
     throw error
   } finally {
     db.close()
-
-    const fileExists = fs.existsSync(dbPath)
   }
 }
 

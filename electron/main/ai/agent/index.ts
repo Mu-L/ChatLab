@@ -5,7 +5,7 @@
 
 import { getActiveConfig, buildPiModel } from '../llm'
 import { getAllTools, createActivateSkillTool } from '../tools'
-import type { ToolContext, OwnerInfo } from '../tools/types'
+import type { ToolContext } from '../tools/types'
 import { getHistoryForAgent } from '../conversations'
 import { aiLogger, isDebugMode } from '../logger'
 import { t as i18nT } from '../../i18n'
@@ -16,7 +16,7 @@ import {
   type Usage as PiUsage,
 } from '@mariozechner/pi-ai'
 
-import type { AgentConfig, AgentStreamChunk, AgentResult, TokenUsage, SkillContext } from './types'
+import type { AgentConfig, AgentStreamChunk, AgentResult, SkillContext } from './types'
 import type { AssistantConfig } from '../assistant/types'
 import { buildSystemPrompt } from './prompt-builder'
 import { extractThinkingContent, stripToolCallTags } from './content-parser'
@@ -25,7 +25,7 @@ import { AgentEventHandler } from './event-handler'
 type SimpleHistoryMessage = { role: 'user' | 'assistant'; content: string }
 
 // Re-export types for external consumers
-export type { AgentConfig, AgentStreamChunk, AgentResult, TokenUsage, AgentRuntimeStatus } from './types'
+export type { AgentConfig, AgentStreamChunk, AgentResult, TokenUsage, AgentRuntimeStatus, SkillContext } from './types'
 
 /**
  * Agent 执行器类
@@ -120,7 +120,8 @@ export class Agent {
           if (newMessages.length > 0) {
             const parts: string[] = []
             for (const m of newMessages) {
-              const msg = m as Record<string, unknown>
+              // pi-ai 的 Message 联合类型较严格，这里仅用于调试日志读取动态字段。
+              const msg = m as unknown as Record<string, unknown>
               parts.push(`--- ${msg.role} ---`)
               const content = msg.content as
                 | Array<{ type: string; text?: string; name?: string; arguments?: unknown }>

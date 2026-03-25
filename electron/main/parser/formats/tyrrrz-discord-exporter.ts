@@ -333,7 +333,7 @@ async function* parseDiscordExporter(options: ParseOptions): AsyncGenerator<Pars
         memberMap.set(author.id, {
           platformId: author.id,
           accountName: author.name,
-          groupNickname: author.nickname || null,
+          groupNickname: author.nickname || undefined,
           avatar: author.avatarUrl,
           roles: convertRoles(author.roles),
         })
@@ -384,7 +384,7 @@ async function* parseDiscordExporter(options: ParseOptions): AsyncGenerator<Pars
         platformMessageId: msg.id, // 消息的平台原始 ID
         senderPlatformId: author.id,
         senderAccountName: author.name,
-        senderGroupNickname: author.nickname || null,
+        senderGroupNickname: author.nickname || undefined,
         timestamp: parseTimestamp(msg.timestamp),
         type: messageType,
         content: content || null,
