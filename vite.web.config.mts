@@ -11,9 +11,49 @@
  */
 
 import { resolve } from 'path'
-import { defineConfig } from 'vite'
+import { spawn, type ChildProcess } from 'child_process'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import ui from '@nuxt/ui/vite'
+
+const BACKEND_PORT = 3400
+
+function chatlabServePlugin(): Plugin {
+  let serverProcess: ChildProcess | null = null
+
+  return {
+    name: 'chatlab-serve',
+    configureServer() {
+      const serverDir = resolve(__dirname, 'packages/server')
+      serverProcess = spawn('npx', ['tsx', 'src/cli.ts', 'serve', '--port', String(BACKEND_PORT)], {
+        cwd: serverDir,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env },
+      })
+
+      serverProcess.stdout?.on('data', (data: Buffer) => {
+        const line = data.toString().trim()
+        if (line) console.log(`[chatlab serve] ${line}`)
+      })
+      serverProcess.stderr?.on('data', (data: Buffer) => {
+        const line = data.toString().trim()
+        if (line) console.error(`[chatlab serve] ${line}`)
+      })
+      serverProcess.on('exit', (code) => {
+        if (code !== null && code !== 0) {
+          console.error(`[chatlab serve] exited with code ${code}`)
+        }
+        serverProcess = null
+      })
+    },
+    buildEnd() {
+      if (serverProcess) {
+        serverProcess.kill()
+        serverProcess = null
+      }
+    },
+  }
+}
 
 export default defineConfig({
   root: 'src/',
@@ -41,6 +81,7 @@ export default defineConfig({
         },
       },
     }),
+    chatlabServePlugin(),
   ],
   build: {
     outDir: resolve(__dirname, 'dist-web'),
@@ -66,8 +107,8 @@ export default defineConfig({
   server: {
     port: 3401,
     proxy: {
-      '/_web': 'http://localhost:3400',
-      '/api': 'http://localhost:3400',
+      '/_web': `http://localhost:${BACKEND_PORT}`,
+      '/api': `http://localhost:${BACKEND_PORT}`,
     },
   },
 })
