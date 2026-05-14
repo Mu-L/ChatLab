@@ -12,9 +12,12 @@ import {
   cleanupPendingDeleteDir,
   needsUnifiedDirMigration,
   migrateToUnifiedDirs,
+  getSystemDataDir,
+  getAiDataDir,
 } from './paths'
 import { migrateAllDatabases, checkMigrationNeeded } from './database/core'
 import { initLocale } from './i18n'
+import { MigrationRunner, ALL_MIGRATIONS } from '@openchatlab/config'
 
 type AppWithQuitFlag = typeof app & { isQuiting?: boolean }
 // 统一通过扩展类型访问退出标记，避免使用 @ts-ignore。
@@ -95,6 +98,17 @@ class MainProcess {
 
     // 确保应用目录存在
     ensureAppDirs()
+
+    // 执行配置数据迁移（Migration Runner，Electron 和 CLI 共享）
+    await new MigrationRunner(ALL_MIGRATIONS, {
+      dataDir: getSystemDataDir(),
+      aiDataDir: getAiDataDir(),
+      logger: {
+        info: (_cat: string, msg: string) => console.log(`[Migration] ${msg}`),
+        warn: (_cat: string, msg: string) => console.warn(`[Migration] ${msg}`),
+        error: (_cat: string, msg: string, ...args: unknown[]) => console.error(`[Migration] ${msg}`, ...args),
+      },
+    }).run()
 
     // 初始化主进程国际化（在 ensureAppDirs 之后，确保 settings 目录存在）
     await initLocale()

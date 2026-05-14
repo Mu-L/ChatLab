@@ -4,7 +4,7 @@
  * 将 @openchatlab/tools 的 ToolDefinition 适配为 @mariozechner/pi-agent-core 的 AgentTool 格式。
  */
 
-import type { AgentTool } from '@mariozechner/pi-agent-core'
+import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core'
 import type { ToolDefinition, ToolExecutionContext } from '@openchatlab/tools'
 import type { DatabaseAdapter } from '@openchatlab/core'
 
@@ -14,24 +14,28 @@ export interface ServerToolContext {
   locale?: string
 }
 
-function convertJsonSchemaToParameters(schema: ToolDefinition['inputSchema']): AgentTool['parameters'] {
+function convertJsonSchemaToParameters(schema: ToolDefinition['inputSchema']) {
   const properties: Record<string, unknown> = {}
   for (const [key, prop] of Object.entries(schema.properties)) {
     properties[key] = { ...prop }
   }
   return {
-    type: 'object',
+    type: 'object' as const,
     properties,
     required: schema.required || [],
   }
 }
 
-export function adaptToolsForAgent(tools: ToolDefinition[], getContext: () => ServerToolContext): AgentTool[] {
+export function adaptToolsForAgent(
+  tools: ToolDefinition[],
+  getContext: () => ServerToolContext
+): AgentTool<any, any>[] {
   return tools.map((tool) => ({
     name: tool.name,
+    label: tool.name,
     description: tool.description,
-    parameters: convertJsonSchemaToParameters(tool.inputSchema),
-    async execute(params: Record<string, unknown>): Promise<string> {
+    parameters: convertJsonSchemaToParameters(tool.inputSchema) as any,
+    async execute(_toolCallId: string, params: Record<string, unknown>): Promise<AgentToolResult<unknown>> {
       const ctx = getContext()
       const execCtx: ToolExecutionContext = {
         db: ctx.db,
@@ -40,9 +44,10 @@ export function adaptToolsForAgent(tools: ToolDefinition[], getContext: () => Se
       }
       try {
         const result = tool.handler(params, execCtx)
-        return result.content
+        return { content: [{ type: 'text', text: result.content }], details: null }
       } catch (error) {
-        return `Error: ${error instanceof Error ? error.message : String(error)}`
+        const msg = error instanceof Error ? error.message : String(error)
+        return { content: [{ type: 'text', text: `Error: ${msg}` }], details: null }
       }
     },
   }))

@@ -16,3 +16,5 @@ export {
   deleteAuthProfile,
 } from './auth-profiles'
 export type { AuthProfile, AuthProfilesData } from './auth-profiles'
+export { MigrationRunner, ALL_MIGRATIONS } from './migrations'
+export type { Migration, MigrationContext, Logger as MigrationLogger } from './migrations'

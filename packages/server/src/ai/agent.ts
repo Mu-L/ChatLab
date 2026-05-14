@@ -7,12 +7,7 @@
 
 import { Agent as PiAgentCore } from '@mariozechner/pi-agent-core'
 import type { AgentEvent as PiAgentEvent } from '@mariozechner/pi-agent-core'
-import {
-  type AssistantMessage as PiAssistantMessage,
-  type Message as PiMessage,
-  type Usage as PiUsage,
-  streamSimple,
-} from '@mariozechner/pi-ai'
+import { type Message as PiMessage, type Usage as PiUsage, streamSimple } from '@mariozechner/pi-ai'
 import type { AIConversationManager } from '@openchatlab/node-runtime'
 
 import { getDefaultAssistantConfig, buildPiModel } from './llm-config'
@@ -52,7 +47,7 @@ export interface RunAgentOptions {
 type SimpleHistoryMessage = { role: 'user' | 'assistant' | 'summary'; content: string }
 
 function buildSystemPrompt(
-  chatType: 'group' | 'private',
+  _chatType: 'group' | 'private',
   assistantSystemPrompt?: string,
   locale: string = 'zh-CN'
 ): string {
@@ -115,16 +110,6 @@ function toPiHistoryMessages(messages: SimpleHistoryMessage[]): PiMessage[] {
       timestamp: Date.now(),
     }
   })
-}
-
-function stripThinkingTags(content: string): string {
-  const tags = ['think', 'analysis', 'reasoning', 'reflection', 'thought', 'thinking']
-  const pattern = tags.join('|')
-  return content.replace(new RegExp(`<(${pattern})>[\\s\\S]*?<\\/\\1>`, 'gi'), '').trim()
-}
-
-function stripToolCallTags(content: string): string {
-  return content.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '').trim()
 }
 
 export async function runServerAgent(options: RunAgentOptions): Promise<void> {

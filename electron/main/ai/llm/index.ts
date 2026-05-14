@@ -10,7 +10,6 @@ import { getAiDataDir } from '../../paths'
 import type { LLMProvider, ProviderInfo, AIServiceConfig, AIConfigStore } from './types'
 import { MAX_CONFIG_COUNT } from './types'
 import { aiLogger } from '../logger'
-import { decryptApiKey, isEncrypted } from './crypto'
 import { resolveApiKey, writeAuthProfile } from '@openchatlab/config'
 import { buildChatLabUserAgentHeaders } from '../../utils/httpHeaders'
 import { t } from '../../i18n'
@@ -93,69 +92,20 @@ function getConfigPath(): string {
   return CONFIG_PATH
 }
 
-// ==================== 旧配置格式（用于迁移）====================
-
-interface LegacyStoredConfig {
-  provider: LLMProvider
-  apiKey: string
-  model?: string
-  maxTokens?: number
-}
-
-function isLegacyConfig(data: unknown): data is LegacyStoredConfig {
-  if (!data || typeof data !== 'object') return false
-  const obj = data as Record<string, unknown>
-  return 'provider' in obj && 'apiKey' in obj && !('configs' in obj)
-}
-
-function migrateLegacyConfig(legacy: LegacyStoredConfig): AIConfigStore {
-  const now = Date.now()
-  const providerDef = getBuiltinProviderById(legacy.provider)
-  const newConfig: AIServiceConfig = {
-    id: randomUUID(),
-    name: providerDef?.name || legacy.provider,
-    provider: legacy.provider,
-    apiKey: legacy.apiKey,
-    model: legacy.model,
-    maxTokens: legacy.maxTokens,
-    createdAt: now,
-    updatedAt: now,
-  }
-
-  return {
-    configs: [newConfig],
-    defaultAssistant: { configId: newConfig.id, modelId: newConfig.model || '' },
-    fastModel: null,
-  }
-}
-
-// ==================== Schema 版本迁移 ====================
+// ==================== Electron-specific 增强迁移 ====================
+// Migration Runner (packages/config/src/migrations) 处理核心数据迁移。
+// 以下仅处理 Electron 特有的自定义 provider/model 注册（v2 迁移的补充步骤）。
 
 import { addCustomProvider as _addCustomProviderDirect } from './custom-provider-store'
 import { addCustomModel as _addCustomModelDirect } from './custom-model-store'
 import { getBuiltinModelById } from './model-catalog'
 
-const CURRENT_SCHEMA_VERSION = 3
-
-/**
- * MiniMax 等旧 provider 的兼容映射表
- * 这些旧 provider 不在新 BUILTIN_PROVIDERS 中，需要自动迁移为自定义 provider
- */
 const LEGACY_PROVIDER_FALLBACKS: Record<string, { name: string; defaultBaseUrl: string }> = {
   minimax: { name: 'MiniMax', defaultBaseUrl: 'https://api.minimaxi.com/v1' },
 }
 
-/**
- * 将旧 AIConfigStore (schemaVersion=1 或无) 迁移到 schemaVersion=2
- * - provider 在新 registry 中存在 → 保持不变
- * - provider 不存在 → 自动创建自定义 provider
- * - model 不在 catalog 中 → 自动创建自定义 model
- * - disableThinking / isReasoningModel → 不迁移（兼容期通过 compat 字段保留）
- */
-function migrateToSchemaV2(store: AIConfigStore): AIConfigStore {
-  aiLogger.info('LLM', 'Migrating config store to schema v2')
-
-  for (const config of store.configs) {
+function ensureCustomProvidersAndModels(configs: AIServiceConfig[]): void {
+  for (const config of configs) {
     const providerId = config.provider
 
     if (!getBuiltinProviderById(providerId)) {
@@ -170,7 +120,6 @@ function migrateToSchemaV2(store: AIConfigStore): AIConfigStore {
             supportsCustomModels: true,
             modelIds: [],
           })
-          aiLogger.info('LLM', `Created custom provider for legacy provider: ${providerId}`)
         } catch {
           // already exists
         }
@@ -178,8 +127,7 @@ function migrateToSchemaV2(store: AIConfigStore): AIConfigStore {
     }
 
     if (config.model && getBuiltinProviderById(providerId)) {
-      const modelInCatalog = getBuiltinModelById(providerId, config.model)
-      if (!modelInCatalog) {
+      if (!getBuiltinModelById(providerId, config.model)) {
         try {
           _addCustomModelDirect({
             id: config.model,
@@ -189,38 +137,11 @@ function migrateToSchemaV2(store: AIConfigStore): AIConfigStore {
             recommendedFor: ['chat'],
             status: 'stable',
           })
-          aiLogger.info('LLM', `Created custom model "${config.model}" under provider "${providerId}"`)
         } catch {
           // already exists
         }
       }
     }
-  }
-
-  return {
-    ...store,
-    configs: store.configs.map((c) => {
-      const { disableThinking: _dt, isReasoningModel: _rm, ...rest } = c as AIServiceConfig & Record<string, unknown>
-      return rest as AIServiceConfig
-    }),
-  }
-}
-
-/**
- * Schema v2 → v3：activeConfigId → defaultAssistant { configId, modelId }
- */
-function migrateToSchemaV3(store: AIConfigStore & { activeConfigId?: string | null }): AIConfigStore {
-  aiLogger.info('LLM', 'Migrating config store to schema v3 (dual-slot model selection)')
-  const legacyActiveId = store.activeConfigId ?? null
-  const resolvedConfig =
-    legacyActiveId && store.configs.find((c) => c.id === legacyActiveId)
-      ? store.configs.find((c) => c.id === legacyActiveId)!
-      : (store.configs[0] ?? null)
-
-  return {
-    configs: store.configs,
-    defaultAssistant: resolvedConfig ? { configId: resolvedConfig.id, modelId: resolvedConfig.model || '' } : null,
-    fastModel: null,
   }
 }
 
@@ -237,7 +158,10 @@ function resolveSlot(
 // ==================== 多配置管理 ====================
 
 /**
- * 加载配置存储（自动处理迁移和解密）
+ * 加载配置存储
+ *
+ * 数据迁移由 MigrationRunner 在应用启动时统一处理。
+ * 此函数只读取最新格式，并从 auth-profiles.json 解析 API Key。
  */
 export function loadConfigStore(): AIConfigStore {
   const configPath = getConfigPath()
@@ -248,72 +172,23 @@ export function loadConfigStore(): AIConfigStore {
 
   try {
     const content = fs.readFileSync(configPath, 'utf-8')
-    const data = JSON.parse(content)
+    const store = JSON.parse(content) as AIConfigStore
 
-    if (isLegacyConfig(data)) {
-      aiLogger.info('LLM', 'Old config format detected, migrating')
-      const migrated = migrateLegacyConfig(data)
-      saveConfigStore(migrated)
-      return loadConfigStore()
-    }
+    ensureCustomProvidersAndModels(store.configs)
 
-    let store = data as AIConfigStore & { schemaVersion?: number; activeConfigId?: string | null }
-    let needsSchemaSave = false
-
-    // Schema v1 → v2 迁移
-    if (!store.schemaVersion || store.schemaVersion < 2) {
-      store = { ...migrateToSchemaV2(store), schemaVersion: 2 } as typeof store
-      needsSchemaSave = true
-    }
-
-    // Schema v2 → v3 迁移
-    if ((store.schemaVersion ?? 0) < 3) {
-      store = { ...migrateToSchemaV3(store), schemaVersion: CURRENT_SCHEMA_VERSION } as typeof store
-      needsSchemaSave = true
-    }
-
-    let needsMigrationSave = false
     const resolvedConfigs = store.configs.map((config) => {
-      // 一次性迁移：旧加密 Key → auth-profiles.json
-      if (config.apiKey && isEncrypted(config.apiKey)) {
-        const plainKey = decryptApiKey(config.apiKey)
-        if (plainKey) {
-          const profileName = config.name?.toLowerCase().replace(/\s+/g, '-') || config.provider
-          writeAuthProfile(profileName, {
-            type: 'api_key',
-            provider: config.provider,
-            key: plainKey,
-          })
-          aiLogger.info('LLM', `Migrated API Key for "${config.name}" to auth-profiles.json`)
-          needsMigrationSave = true
-          return { ...config, apiKey: plainKey }
-        }
-        aiLogger.warn('LLM', `Failed to decrypt API Key for "${config.name}", skipping migration`)
-        return { ...config, apiKey: '' }
-      }
-
-      // 正常流程：从 auth-profiles.json 读取
       const profileKey = resolveApiKey(
         config.provider,
-        (config as Record<string, unknown>).authProfile as string | undefined
+        (config as unknown as Record<string, unknown>).authProfile as string | undefined
       )
       return { ...config, apiKey: profileKey || config.apiKey || '' }
     })
 
-    if (needsMigrationSave || needsSchemaSave) {
-      aiLogger.info('LLM', 'Saving migrated config store (removing encrypted keys)')
-      saveConfigStoreRaw({
-        ...store,
-        configs: store.configs.map((config) => ({
-          ...config,
-          apiKey: '',
-        })),
-      })
-    }
-
     return {
       ...store,
       configs: resolvedConfigs,
+      defaultAssistant: resolveSlot(store.defaultAssistant, resolvedConfigs),
+      fastModel: resolveSlot(store.fastModel, resolvedConfigs),
     }
   } catch (error) {
     aiLogger.error('LLM', 'Failed to load configs', error)

@@ -9,7 +9,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as crypto from 'crypto'
 import type { FastifyInstance } from 'fastify'
-import { loadConfig, getConfigDir } from '@openchatlab/config'
+import { loadConfig, getConfigDir, MigrationRunner, ALL_MIGRATIONS } from '@openchatlab/config'
 import type { ChatLabConfig } from '@openchatlab/config'
 import { NodePathProvider, DatabaseManager, AIConversationManager } from '@openchatlab/node-runtime'
 import { createServer } from './server'
@@ -83,6 +83,17 @@ export async function startHttpServer(options?: HttpServerOptions): Promise<{
   const userDataDir = config.data.user_data_dir || undefined
   const pathProvider = new NodePathProvider(userDataDir)
   pathProvider.ensureAllDirs()
+
+  const migrationRunner = new MigrationRunner(ALL_MIGRATIONS, {
+    dataDir: pathProvider.getSystemDir(),
+    aiDataDir: pathProvider.getAiDataDir(),
+    logger: {
+      info: (_cat: string, msg: string) => console.log(`[Migration] ${msg}`),
+      warn: (_cat: string, msg: string) => console.warn(`[Migration] ${msg}`),
+      error: (_cat: string, msg: string, ...args: unknown[]) => console.error(`[Migration] ${msg}`, ...args),
+    },
+  })
+  await migrationRunner.run()
   const nativeBinding = resolveNativeBinding()
   dbManager = new DatabaseManager(pathProvider, { nativeBinding })
   convManager = new AIConversationManager(pathProvider.getAiDataDir(), { nativeBinding })
