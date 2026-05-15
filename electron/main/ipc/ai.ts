@@ -19,7 +19,7 @@ import { completeSimple, streamSimple, type PiMessage, type PiTextContent } from
 import { t } from '../i18n'
 import type { ToolContext } from '../ai/tools/types'
 import { TOOL_REGISTRY } from '../ai/tools/definitions'
-import { getDefaultRulesForLocale, mergeRulesForLocale } from '../ai/preprocessor/builtin-rules'
+import { getDefaultRulesForLocale, mergeRulesForLocale } from '@openchatlab/node-runtime'
 import type { IpcContext } from './types'
 
 function toPiSimpleMessages(messages: Array<{ role: string; content: string }>, timestamp: number): PiMessage[] {

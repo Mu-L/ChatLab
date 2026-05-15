@@ -3,7 +3,7 @@
  */
 
 import type { AgentTool } from '@openchatlab/node-runtime'
-import type { PreprocessConfig } from '../preprocessor'
+import type { PreprocessConfig } from '@openchatlab/node-runtime'
 
 export type ToolCategory = 'core' | 'analysis'
 

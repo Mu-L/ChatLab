@@ -6,7 +6,7 @@
  */
 
 import type { PreprocessConfig, PreprocessableMessage, TruncationStrategy } from './types'
-import { preprocessMessages } from './pipeline'
+import { preprocessMessages, type PreprocessLogger } from './pipeline'
 import {
   formatMessageCompact,
   anonymizeMessageNames,
@@ -25,6 +25,8 @@ export interface PreprocessingPipelineOptions {
   truncationStrategy?: TruncationStrategy
   /** rawMessages 之外的附加元数据（如 total、timeRange），会合并到输出 details */
   extraDetails?: Record<string, unknown>
+  /** 可选的日志记录器，Electron 端注入 aiLogger 以记录管道统计信息 */
+  logger?: PreprocessLogger
 }
 
 export interface PreprocessingPipelineResult {
@@ -42,9 +44,10 @@ export function applyPreprocessingPipeline(options: PreprocessingPipelineOptions
     maxToolResultTokens,
     truncationStrategy = 'keep_last',
     extraDetails = {},
+    logger,
   } = options
 
-  const processed = preprocessMessages(rawMessages, preprocessConfig)
+  const processed = preprocessMessages(rawMessages, preprocessConfig, logger)
 
   let nameMapLine = ''
   if (anonymizeNames) {

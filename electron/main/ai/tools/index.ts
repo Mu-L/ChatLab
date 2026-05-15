@@ -12,6 +12,12 @@ import { TOOL_REGISTRY } from './definitions'
 const CORE_TOOL_NAMES = new Set(TOOL_REGISTRY.filter((e) => e.category === 'core').map((e) => e.name))
 import { t as i18nT } from '../../i18n'
 import { applyPreprocessingPipeline, type PreprocessableMessage } from '@openchatlab/node-runtime'
+import { aiLogger } from '../logger'
+
+const preprocessLogger = {
+  info: (category: string, message: string, extra?: Record<string, unknown>) => aiLogger.info(category, message, extra),
+  warn: (category: string, message: string, extra?: Record<string, unknown>) => aiLogger.warn(category, message, extra),
+}
 import { getSkillConfig } from '../skills'
 import { createActivateSkillTool as sharedCreateActivateSkillTool } from '@openchatlab/node-runtime'
 
@@ -80,6 +86,7 @@ function wrapWithPreprocessing(tool: AgentTool<any>, context: ToolContext): Agen
         maxToolResultTokens: context.maxToolResultTokens,
         truncationStrategy: TRUNCATION_STRATEGY_MAP.get(tool.name) ?? 'keep_last',
         extraDetails: restDetails as Record<string, unknown>,
+        logger: preprocessLogger,
       })
 
       return {
