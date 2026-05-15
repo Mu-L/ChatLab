@@ -18,4 +18,4 @@ export {
   importSkillFromMd,
 } from './manager'
 
-export { parseSkillFile } from './parser'
+export { parseSkillFile } from '@openchatlab/node-runtime'

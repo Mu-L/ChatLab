@@ -17,7 +17,7 @@ import * as path from 'path'
 import { randomUUID } from 'crypto'
 import { getAiDataDir, ensureDir } from '../../paths'
 import { aiLogger } from '../logger'
-import { parseAssistantFile, serializeAssistant } from './parser'
+import { parseAssistantFile, serializeAssistant } from '@openchatlab/node-runtime'
 import type {
   AssistantConfig,
   AssistantSummary,

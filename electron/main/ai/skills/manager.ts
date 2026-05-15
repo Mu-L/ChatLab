@@ -15,7 +15,7 @@ import * as path from 'path'
 import { createHash } from 'crypto'
 import { getAiDataDir, ensureDir } from '../../paths'
 import { aiLogger } from '../logger'
-import { parseSkillFile } from './parser'
+import { parseSkillFile } from '@openchatlab/node-runtime'
 import type { SkillDef, SkillSummary, SkillInitResult, SkillSaveResult, BuiltinSkillInfo } from './types'
 
 // ==================== 内置技能模板 ====================
