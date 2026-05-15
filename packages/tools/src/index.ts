@@ -6,6 +6,7 @@
  */
 
 export { TOOL_REGISTRY, getToolByName } from './registry'
+export { CoreDataProvider } from './providers/core-data-provider'
 export type {
   ToolDefinition,
   ToolExecutionContext,
