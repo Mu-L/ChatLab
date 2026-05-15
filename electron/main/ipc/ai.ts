@@ -9,18 +9,70 @@ import { serializeError } from '../ai/serialize-error'
 import { getLogsDir } from '../paths'
 import { Agent, type AgentStreamChunk, type SkillContext } from '../ai/agent'
 import { getDefaultGeneralAssistantId } from '../ai/assistant/defaultGeneral'
-import { getDefaultAssistantConfig, buildPiModel } from '../ai/llm'
-import { checkAndCompress, manualCompress, type CompressionConfig } from '../ai/compression'
+import { getDefaultAssistantConfig, buildPiModel, findModelDefinition } from '../ai/llm'
+import type { AIServiceConfig } from '../ai/llm/types'
 import { countMessagesTokens } from '../ai/tokenizer'
 import * as assistantManager from '../ai/assistant'
 import type { AssistantConfig } from '../ai/assistant/types'
 import * as skillManager from '../ai/skills'
-import { completeSimple, streamSimple, type PiMessage, type PiTextContent } from '@openchatlab/node-runtime'
+import {
+  checkAndCompress,
+  manualCompress,
+  type CompressionConfig,
+  type CompressionLlmAdapter,
+  completeSimple,
+  streamSimple,
+  type PiMessage,
+  type PiTextContent,
+} from '@openchatlab/node-runtime'
+import { getManager as getConversationManager } from '../ai/conversations'
 import { t } from '../i18n'
 import type { ToolContext } from '../ai/tools/types'
 import { TOOL_REGISTRY } from '../ai/tools/definitions'
 import { getDefaultRulesForLocale, mergeRulesForLocale } from '@openchatlab/node-runtime'
 import type { IpcContext } from './types'
+
+const DEFAULT_CONTEXT_WINDOW = 128000
+
+const compressionLogger = {
+  info: (cat: string, msg: string, extra?: Record<string, unknown>) => aiLogger.info(cat, msg, extra),
+  warn: (cat: string, msg: string, extra?: Record<string, unknown>) => aiLogger.warn(cat, msg, extra),
+  error: (cat: string, msg: string, extra?: Record<string, unknown>) => aiLogger.error(cat, msg, extra),
+}
+
+function createCompressionLlmAdapter(
+  activeAIConfig: AIServiceConfig,
+  onCompressing?: () => void
+): CompressionLlmAdapter {
+  const modelDef = findModelDefinition(activeAIConfig.provider, activeAIConfig.model || '')
+  const contextWindow = modelDef?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+  const piModel = buildPiModel(activeAIConfig)
+
+  return {
+    contextWindow,
+    compress: async (prompt: string, maxTokens: number) => {
+      onCompressing?.()
+      try {
+        const result = await completeSimple(
+          piModel,
+          {
+            systemPrompt: undefined,
+            messages: [{ role: 'user', content: [{ type: 'text', text: prompt }], timestamp: Date.now() }] as any,
+          },
+          { apiKey: activeAIConfig.apiKey, maxTokens }
+        )
+        const text = result.content
+          .filter((item): item is PiTextContent => item.type === 'text')
+          .map((item) => item.text)
+          .join('')
+        return text || null
+      } catch (error) {
+        aiLogger.warn('Compression', 'LLM compression attempt failed', { error: String(error) })
+        return null
+      }
+    },
+  }
+}
 
 function toPiSimpleMessages(messages: Array<{ role: string; content: string }>, timestamp: number): PiMessage[] {
   // pi-ai 的 simple API 在类型上要求完整 Message 联合，这里沿用现有轻量消息格式并集中做兼容转换。
@@ -1120,8 +1172,7 @@ export function registerAIHandlers({ win }: IpcContext): void {
               context.conversationId,
               compressionConfig,
               systemPromptForCompression,
-              activeAIConfig,
-              () => {
+              createCompressionLlmAdapter(activeAIConfig, () => {
                 win.webContents.send('agent:streamChunk', {
                   requestId,
                   chunk: {
@@ -1136,7 +1187,9 @@ export function registerAIHandlers({ win }: IpcContext): void {
                     } satisfies import('@electron/shared/types').AgentRuntimeStatus,
                   },
                 })
-              }
+              }),
+              getConversationManager(),
+              compressionLogger
             )
 
             aiLogger.info('IPC', `Compression result for ${requestId}`, compressionResult)
@@ -1351,7 +1404,14 @@ export function registerAIHandlers({ win }: IpcContext): void {
           return { success: false, error: t('llm.notConfigured') }
         }
 
-        const result = await manualCompress(conversationId, compressionConfig, systemPrompt, activeAIConfig)
+        const result = await manualCompress(
+          conversationId,
+          compressionConfig,
+          systemPrompt,
+          createCompressionLlmAdapter(activeAIConfig),
+          getConversationManager(),
+          compressionLogger
+        )
         return { success: true, result }
       } catch (error) {
         aiLogger.error('IPC', 'Manual compression failed', { error: String(error) })
