@@ -24,3 +24,10 @@ export type {
   StreamParseFileInfoResult,
   StreamParseFileInfoDeps,
 } from './streaming-importer'
+export { analyzeIncrementalImport, incrementalImport } from './incremental-importer'
+export type {
+  ImportOptions,
+  IncrementalAnalyzeResult,
+  IncrementalImportResult,
+  IncrementalImportDeps,
+} from './incremental-importer'

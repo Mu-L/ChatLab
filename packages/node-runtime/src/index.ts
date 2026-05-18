@@ -7,8 +7,15 @@
 
 export { BetterSqliteAdapter, openBetterSqliteDatabase } from './better-sqlite3-adapter'
 
-// Import data writing + perf logging + streaming importer
-export { writeParseResultToDb, streamingImport, analyzeNewImport, streamParseFileInfo } from './import'
+// Import data writing + perf logging + streaming importer + incremental importer
+export {
+  writeParseResultToDb,
+  streamingImport,
+  analyzeNewImport,
+  streamParseFileInfo,
+  analyzeIncrementalImport,
+  incrementalImport,
+} from './import'
 export type {
   ImportMeta,
   WriteParseResultStats,
@@ -21,6 +28,10 @@ export type {
   AnalyzeNewImportResult,
   StreamParseFileInfoResult,
   StreamParseFileInfoDeps,
+  ImportOptions,
+  IncrementalAnalyzeResult,
+  IncrementalImportResult,
+  IncrementalImportDeps,
 } from './import'
 export {
   LogLevel,
