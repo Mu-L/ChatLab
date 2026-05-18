@@ -48,9 +48,9 @@ For more previews, please visit the official website: [chatlab.fun](https://chat
 
 ### Runtime Architecture
 
-- **Main Process (control plane)**: `electron/main/index.ts` handles lifecycle and windows. `electron/main/ipc/` defines domain-scoped IPC, while `electron/main/ai/` and `electron/main/i18n/` provide shared AI and localization services.
-- **Worker Layer (compute plane)**: `electron/main/worker/` runs import, indexing, and query tasks via `workerManager`, keeping CPU-heavy work off the UI thread.
-- **Renderer Layer (interaction plane)**: Vue 3 + Nuxt UI + Tailwind CSS drive management, private chat, group chat, and analysis interfaces. `electron/preload/index.ts` exposes tightly scoped APIs for secure process boundaries.
+- **Main Process (control plane)**: `apps/desktop/main/index.ts` handles lifecycle and windows. `apps/desktop/main/ipc/` defines domain-scoped IPC. Core AI, query, NLP, import, and merge logic lives in shared packages (`packages/core`, `packages/node-runtime`, `packages/tools`); `apps/desktop/main/ai/` and `apps/desktop/main/i18n/` are thin Electron adaptation layers.
+- **Worker Layer (compute plane)**: `apps/desktop/main/worker/` runs import, indexing, and query tasks via `workerManager`, delegating core logic to `@openchatlab/core` and `@openchatlab/node-runtime`.
+- **Renderer Layer (interaction plane)**: Vue 3 + Nuxt UI + Tailwind CSS drive management, private chat, group chat, and analysis interfaces. `apps/desktop/preload/index.ts` exposes tightly scoped APIs for secure process boundaries.
 
 ### Data Pipeline
 

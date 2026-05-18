@@ -48,9 +48,9 @@ ChatLab 是一个专注于社交记录分析的本地化应用。通过 AI Agent
 
 ### 运行时架构（Runtime Architecture）
 
-- **Main Process（控制层）**：`electron/main/index.ts` 负责生命周期与窗口；`electron/main/ipc/` 提供分域 IPC；`electron/main/ai/` 与 `electron/main/i18n/` 提供 AI 与国际化基础能力。
-- **Worker Layer（计算层）**：`electron/main/worker/` 通过 `workerManager` 调度任务，隔离导入、索引与查询计算，降低 UI 阻塞风险。
-- **Renderer Layer（交互层）**：基于 Vue 3 + Nuxt UI + Tailwind CSS，承载管理、私聊、群聊与分析视图；通过 `electron/preload/index.ts` 暴露受控 API，确保渲染层与主进程隔离。
+- **Main Process（控制层）**：`apps/desktop/main/index.ts` 负责生命周期与窗口；`apps/desktop/main/ipc/` 提供分域 IPC。核心 AI、查询、NLP、导入、合并逻辑位于共享包（`packages/core`、`packages/node-runtime`、`packages/tools`）；`apps/desktop/main/ai/` 与 `apps/desktop/main/i18n/` 是 Electron 薄适配层。
+- **Worker Layer（计算层）**：`apps/desktop/main/worker/` 通过 `workerManager` 调度任务，核心逻辑委托给 `@openchatlab/core` 和 `@openchatlab/node-runtime`，隔离导入、索引与查询计算。
+- **Renderer Layer（交互层）**：基于 Vue 3 + Nuxt UI + Tailwind CSS，承载管理、私聊、群聊与分析视图；通过 `apps/desktop/preload/index.ts` 暴露受控 API，确保渲染层与主进程隔离。
 
 ### 数据闭环（Data Pipeline）
 

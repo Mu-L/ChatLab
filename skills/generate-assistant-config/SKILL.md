@@ -14,11 +14,11 @@ description: Use when 用户希望根据一句自然语言需求创建新的 Cha
 - 当前仓库里的 `assistant/*.md` 可视为历史参考样例；新生成的多语言 assistant 写入 `assistant/<locale>/`
 - 当前项目 assistant 的真实格式以运行时代码为准，不以过期文档为准
 - 如 `.docs/ai/assistantSystem.md` 与运行时代码冲突，以以下文件为准：
-  - `electron/main/ai/assistant/parser.ts`
-  - `electron/main/ai/assistant/types.ts`
-  - `electron/main/ai/assistant/manager.ts`
-  - `electron/main/ai/tools/definitions/index.ts`
-  - `electron/main/ai/tools/definitions/sql-analysis.ts`
+  - `apps/desktop/main/ai/assistant/parser.ts`
+  - `apps/desktop/main/ai/assistant/types.ts`
+  - `apps/desktop/main/ai/assistant/manager.ts`
+  - `apps/desktop/main/ai/tools/definitions/index.ts`
+  - `apps/desktop/main/ai/tools/definitions/sql-analysis.ts`
 
 ## 必读上下文
 
@@ -29,13 +29,13 @@ description: Use when 用户希望根据一句自然语言需求创建新的 Cha
    - `.docs/ai/README.md`
    - `.docs/ai/assistantSystem.md`
 2. assistant 真实格式与落地约束
-   - `electron/main/ai/assistant/parser.ts`
-   - `electron/main/ai/assistant/types.ts`
-   - `electron/main/ai/assistant/manager.ts`
+   - `apps/desktop/main/ai/assistant/parser.ts`
+   - `apps/desktop/main/ai/assistant/types.ts`
+   - `apps/desktop/main/ai/assistant/manager.ts`
 3. 默认骨架与工具来源
-   - `electron/main/ai/assistant/builtins/general_cn.md`
-   - `electron/main/ai/tools/definitions/index.ts`
-   - `electron/main/ai/tools/definitions/sql-analysis.ts`
+   - `apps/desktop/main/ai/assistant/builtins/general_cn.md`
+   - `apps/desktop/main/ai/tools/definitions/index.ts`
+   - `apps/desktop/main/ai/tools/definitions/sql-analysis.ts`
 
 ## 硬规则
 
