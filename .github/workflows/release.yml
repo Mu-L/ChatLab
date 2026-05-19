@@ -169,84 +169,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 1 # 只保留1天，Release后会上传到GitHub Releases
 
-  build-linux:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: x64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          package-manager-cache: false
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-${{ matrix.arch }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-pnpm-store-
-
-      - name: Install dependencies
-        run: |
-          echo "node-linker=hoisted" >> .npmrc
-          pnpm install
-
-      - name: Cache Electron and electron-builder binaries
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: ${{ runner.os }}-${{ matrix.arch }}-electron-builder-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-electron-builder-
-
-      - name: Build Electron app for Linux (${{ matrix.arch }})
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
-        working-directory: apps/desktop
-        run: |
-          pnpm run build
-          if [ "${{ matrix.arch }}" = "arm64" ]; then
-            pnpm exec electron-builder --linux deb --arm64 --config electron-builder.yml -p never
-          else
-            pnpm exec electron-builder --linux --config electron-builder.yml -p never
-          fi
-
-      - name: Upload Linux artifacts (${{ matrix.arch }})
-        uses: actions/upload-artifact@v6
-        with:
-          name: ChatLab-linux-${{ matrix.arch }}
-          path: |
-            apps/desktop/dist/*.AppImage
-            apps/desktop/dist/*.deb
-            apps/desktop/dist/*.tar.gz
-            apps/desktop/dist/*.yml
-            apps/desktop/dist/*.json
-          if-no-files-found: warn
-          retention-days: 1
-
   release:
-    needs: [build-mac, build-win, build-linux]
+    needs: [build-mac, build-win]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
 
@@ -270,18 +194,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ChatLab-win
-          path: release-dist
-
-      - name: Download Linux artifacts
-        uses: actions/download-artifact@v8
-        with:
-          name: ChatLab-linux-x64
-          path: release-dist
-
-      - name: Download Linux artifacts (arm64)
-        uses: actions/download-artifact@v8
-        with:
-          name: ChatLab-linux-arm64
           path: release-dist
 
       - name: List files
@@ -330,7 +242,6 @@ jobs:
             echo "| Mac (Apple Silicon) | [ChatLab-${VERSION_NUMBER}-arm64.dmg](https://github.com/ChatLab/ChatLab/releases/download/v${VERSION_NUMBER}/ChatLab-${VERSION_NUMBER}-arm64.dmg) |"
             echo "| Mac (Intel) | [ChatLab-${VERSION_NUMBER}-x64.dmg](https://github.com/ChatLab/ChatLab/releases/download/v${VERSION_NUMBER}/ChatLab-${VERSION_NUMBER}-x64.dmg) |"
             echo "| Windows | [ChatLab-${VERSION_NUMBER}-setup.exe](https://github.com/ChatLab/ChatLab/releases/download/v${VERSION_NUMBER}/ChatLab-${VERSION_NUMBER}-setup.exe) |"
-            echo "| Linux | [ChatLab-${VERSION_NUMBER}.AppImage](https://github.com/ChatLab/ChatLab/releases/download/v${VERSION_NUMBER}/ChatLab-${VERSION_NUMBER}.AppImage) |"
           } > release_notes.md
 
           echo "Generated release notes:"
@@ -346,9 +257,6 @@ jobs:
             release-dist/*.exe
             release-dist/*.dmg
             release-dist/*.zip
-            release-dist/*.AppImage
-            release-dist/*.deb
-            release-dist/*.tar.gz
             release-dist/*.yml
             release-dist/*.blockmap
         env:

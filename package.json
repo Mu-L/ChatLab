@@ -25,7 +25,6 @@
     "build:desktop": "pnpm --filter @openchatlab/desktop build",
     "build:mac": "pnpm --filter @openchatlab/desktop build:mac",
     "build:win": "pnpm --filter @openchatlab/desktop build:win",
-    "build:linux": "pnpm --filter @openchatlab/desktop build:linux",
     "dev:app": "vite --config vite.web.config.mts",
     "dev:serve": "bash scripts/dev-serve.sh",
     "dev:web": "pnpm run ensure:server-native && CHATLAB_AUTO_SERVE=1 vite --config vite.web.config.mts",

@@ -67,19 +67,5 @@ mac:
 dmg:
   artifactName: ChatLab-${version}-${arch}.${ext}
 
-# Linux 平台配置
-linux:
-  executableName: chatlab
-  icon: build/icon.png
-  target:
-    - AppImage
-    - deb
-    - tar.gz
-  category: Utility
-
-# AppImage 配置
-appImage:
-  artifactName: ChatLab-${version}.${ext}
-
 # 是否在构建之前重新编译原生模块
 npmRebuild: true
