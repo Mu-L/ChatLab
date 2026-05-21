@@ -289,17 +289,13 @@ jobs:
       - name: Build CLI (with Web UI)
         run: pnpm --filter chatlab-cli run build:full
 
-      - name: Pack CLI npm package
-        working-directory: apps/cli
-        run: |
-          mkdir -p ../../cli-package
-          npm pack --pack-destination ../../cli-package --json
-
-      - name: Upload CLI npm package
+      - name: Upload CLI build output
         uses: actions/upload-artifact@v6
         with:
-          name: ChatLab-cli-package
-          path: cli-package/*.tgz
+          name: ChatLab-cli-build
+          path: |
+            apps/cli/dist
+            apps/cli/dist-web
           if-no-files-found: error
           retention-days: 1
 
@@ -468,12 +464,21 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
-      - name: Download CLI npm package
+      - name: Inject CLI version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('apps/cli/package.json', 'utf-8'));
+            pkg.version = '${{ needs.prepare_release.outputs.version }}';
+            fs.writeFileSync('apps/cli/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Download CLI build output
         uses: actions/download-artifact@v8
         with:
-          name: ChatLab-cli-package
-          path: cli-package
+          name: ChatLab-cli-build
+          path: apps/cli
 
       - name: Publish to npm
         working-directory: apps/cli
-        run: npm publish ../../cli-package/*.tgz --tag ${{ needs.prepare_release.outputs.npm_tag }}
+        run: npm publish --tag ${{ needs.prepare_release.outputs.npm_tag }}
